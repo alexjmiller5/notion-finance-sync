@@ -17,6 +17,8 @@ import httpx
 import structlog
 
 from notion_finance_sync.config.settings import NOTION_API_VERSION
+from notion_finance_sync.models.transactions import TransactionRecord
+from notion_finance_sync.notion.encoders import encode_for_create, encode_for_update
 
 logger = structlog.get_logger()
 
@@ -107,6 +109,7 @@ class NotionClient:
     @staticmethod
     def _row_from_props(page_id: str, props: dict[str, Any]) -> dict[str, Any]:
         """Decode Notion property dict into a flat row representation."""
+
         def text(name: str) -> str:
             rt = props.get(name, {}).get("rich_text", [])
             return rt[0]["plain_text"] if rt else ""
@@ -177,6 +180,14 @@ class NotionClient:
             f"https://api.notion.com/v1/pages/{page_id}",
             json={"properties": properties},
         )
+
+    async def create_from_record(self, record: TransactionRecord) -> None:
+        """Create a new Notion page from a TransactionRecord."""
+        await self.create_transaction(encode_for_create(record))
+
+    async def update_from_record(self, page_id: str, record: TransactionRecord) -> None:
+        """Update an existing Notion page from a TransactionRecord."""
+        await self.update_transaction(page_id, encode_for_update(record))
 
     async def release_transaction(
         self,
