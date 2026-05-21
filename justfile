@@ -2,6 +2,10 @@
 default:
     @just --list
 
+# Set PYTHONPATH for all script invocations (the editable .pth file isn't
+# auto-loaded by `uv run` in this venv — explicit path is more reliable).
+export PYTHONPATH := "src"
+
 # Run all banks (daily sync)
 sync:
     uv run python scripts/sync.py
@@ -21,6 +25,10 @@ backfill bank since:
 # One-shot Notion schema migration (rename SimpleFIN fields, add new fields)
 migrate:
     uv run python scripts/migrate_schema.py
+
+# Preview the schema migration without applying
+migrate-dry-run:
+    uv run python scripts/migrate_schema.py --dry-run
 
 # Start the FastAPI HTTP server (foreground)
 serve:
