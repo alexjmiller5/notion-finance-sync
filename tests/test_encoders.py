@@ -7,6 +7,7 @@ Coverage:
 - Investment record (quantity/ticker/price_per_share, no category/rewards)
 - bilt_partner=False IS emitted (checkbox always present)
 - create_from_record / update_from_record send correct HTTP bodies (via respx)
+- Both create_from_record and update_from_record delegate to encode_transaction
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from notion_finance_sync.models.transactions import (
     TransactionStatus,
 )
 from notion_finance_sync.notion.client import NotionClient
-from notion_finance_sync.notion.encoders import encode_for_create, encode_for_update
+from notion_finance_sync.notion.encoders import encode_transaction
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -95,14 +96,14 @@ def make_investment_record() -> TransactionRecord:
 
 
 # ---------------------------------------------------------------------------
-# Tests: encode_for_create — fully populated record
+# Tests: encode_transaction — fully populated record
 # ---------------------------------------------------------------------------
 
 
-class TestEncodeForCreateFullRecord:
+class TestEncodeTransactionFullRecord:
     def setup_method(self):
         self.record = make_full_record()
-        self.props = encode_for_create(self.record)
+        self.props = encode_transaction(self.record)
 
     def test_title_encoded(self):
         assert self.props["Name"] == {"title": [{"text": {"content": "Starbucks"}}]}
@@ -182,14 +183,14 @@ class TestEncodeForCreateFullRecord:
 
 
 # ---------------------------------------------------------------------------
-# Tests: encode_for_create — sparse record
+# Tests: encode_transaction — sparse record
 # ---------------------------------------------------------------------------
 
 
-class TestEncodeForCreateSparseRecord:
+class TestEncodeTransactionSparseRecord:
     def setup_method(self):
         self.record = make_sparse_record()
-        self.props = encode_for_create(self.record)
+        self.props = encode_transaction(self.record)
 
     def test_required_fields_present(self):
         assert "Name" in self.props
@@ -261,37 +262,37 @@ class TestStrEnumEncoding:
     def test_status_pending_encodes_by_value(self):
         record = make_sparse_record()
         record.status = TransactionStatus.PENDING
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Transaction Status"] == {"status": {"name": "Pending"}}
 
     def test_status_released_encodes_by_value(self):
         record = make_sparse_record()
         record.status = TransactionStatus.RELEASED
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Transaction Status"] == {"status": {"name": "Released"}}
 
     def test_bank_name_encodes_by_value(self):
         record = make_sparse_record()
         record.bank = BankName.WELLS_FARGO
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Bank"] == {"select": {"name": "Wells Fargo"}}
 
     def test_card_network_visa_encodes_by_value(self):
         record = make_sparse_record()
         record.card_network = CardNetwork.VISA
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Card Network"] == {"select": {"name": "Visa"}}
 
     def test_account_type_brokerage_encodes_by_value(self):
         record = make_sparse_record()
         record.account_type = AccountType.BROKERAGE
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Account Type"] == {"select": {"name": "Brokerage"}}
 
     def test_category_groceries_encodes_by_value(self):
         record = make_sparse_record()
         record.category = CanonicalCategory.GROCERIES
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert props["Category"] == {"select": {"name": "Groceries"}}
 
 
@@ -303,7 +304,7 @@ class TestStrEnumEncoding:
 class TestInvestmentRecord:
     def setup_method(self):
         self.record = make_investment_record()
-        self.props = encode_for_create(self.record)
+        self.props = encode_transaction(self.record)
 
     def test_quantity_encoded(self):
         assert self.props["Quantity"] == {"number": 3.5}
@@ -336,44 +337,40 @@ class TestCheckboxAlwaysEmitted:
     def test_bilt_partner_false_emitted(self):
         record = make_sparse_record()
         assert record.bilt_partner is False
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert "Bilt Partner" in props
         assert props["Bilt Partner"] == {"checkbox": False}
 
     def test_bilt_partner_true_emitted(self):
         record = make_sparse_record()
         record.bilt_partner = True
-        props = encode_for_create(record)
+        props = encode_transaction(record)
         assert "Bilt Partner" in props
         assert props["Bilt Partner"] == {"checkbox": True}
 
 
 # ---------------------------------------------------------------------------
-# Tests: encode_for_update
+# Tests: encode_transaction
 # ---------------------------------------------------------------------------
 
 
-class TestEncodeForUpdate:
-    def test_full_record_produces_same_field_set_as_create(self):
+class TestEncodeTransactionConsistency:
+    def test_full_record_field_set_is_stable(self):
         record = make_full_record()
-        create_props = encode_for_create(record)
-        update_props = encode_for_update(record)
-        assert set(create_props.keys()) == set(update_props.keys())
-
-    def test_update_values_match_create_values(self):
-        record = make_full_record()
-        assert encode_for_create(record) == encode_for_update(record)
+        props_a = encode_transaction(record)
+        props_b = encode_transaction(record)
+        assert set(props_a.keys()) == set(props_b.keys())
 
     def test_sparse_record_absent_fields_still_absent(self):
         record = make_sparse_record()
-        props = encode_for_update(record)
+        props = encode_transaction(record)
         assert "Transacted At" not in props
         assert "Category" not in props
         assert "Bank" not in props
 
-    def test_bilt_partner_present_in_update(self):
+    def test_bilt_partner_always_present(self):
         record = make_sparse_record()
-        props = encode_for_update(record)
+        props = encode_transaction(record)
         assert "Bilt Partner" in props
 
 
@@ -386,7 +383,7 @@ class TestNotionClientCreateFromRecord:
     @pytest.mark.asyncio
     async def test_create_from_record_posts_correct_body(self, respx_mock):
         record = make_full_record()
-        expected_props = encode_for_create(record)
+        expected_props = encode_transaction(record)
 
         respx_mock.post("https://api.notion.com/v1/pages").mock(
             return_value=httpx.Response(200, json={"object": "page", "id": "new-page-id"})
@@ -405,7 +402,7 @@ class TestNotionClientCreateFromRecord:
     @pytest.mark.asyncio
     async def test_create_from_record_sparse(self, respx_mock):
         record = make_sparse_record()
-        expected_props = encode_for_create(record)
+        expected_props = encode_transaction(record)
 
         respx_mock.post("https://api.notion.com/v1/pages").mock(
             return_value=httpx.Response(200, json={"object": "page", "id": "new-page-id"})
@@ -423,7 +420,7 @@ class TestNotionClientUpdateFromRecord:
     @pytest.mark.asyncio
     async def test_update_from_record_patches_correct_body(self, respx_mock):
         record = make_full_record()
-        expected_props = encode_for_update(record)
+        expected_props = encode_transaction(record)
 
         respx_mock.patch(f"https://api.notion.com/v1/pages/{PAGE_ID}").mock(
             return_value=httpx.Response(200, json={"object": "page", "id": PAGE_ID})

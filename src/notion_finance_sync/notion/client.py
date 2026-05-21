@@ -18,7 +18,7 @@ import structlog
 
 from notion_finance_sync.config.settings import NOTION_API_VERSION
 from notion_finance_sync.models.transactions import TransactionRecord
-from notion_finance_sync.notion.encoders import encode_for_create, encode_for_update
+from notion_finance_sync.notion.encoders import encode_transaction
 
 logger = structlog.get_logger()
 
@@ -183,11 +183,11 @@ class NotionClient:
 
     async def create_from_record(self, record: TransactionRecord) -> None:
         """Create a new Notion page from a TransactionRecord."""
-        await self.create_transaction(encode_for_create(record))
+        await self.create_transaction(encode_transaction(record))
 
     async def update_from_record(self, page_id: str, record: TransactionRecord) -> None:
         """Update an existing Notion page from a TransactionRecord."""
-        await self.update_transaction(page_id, encode_for_update(record))
+        await self.update_transaction(page_id, encode_transaction(record))
 
     async def release_transaction(
         self,

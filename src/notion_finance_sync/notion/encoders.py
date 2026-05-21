@@ -45,7 +45,12 @@ def _checkbox(value: bool) -> dict[str, Any]:
     return {"checkbox": value}
 
 
-def _build_properties(record: TransactionRecord) -> dict[str, Any]:
+def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
+    """Return the ``properties`` dict for both POST /v1/pages and PATCH /v1/pages/{id}.
+
+    Notion treats absent fields as "leave unchanged" so omitting None/empty
+    values is correct for both create and update operations.
+    """
     props: dict[str, Any] = {}
 
     props["Name"] = _title(record.name)
@@ -66,7 +71,7 @@ def _build_properties(record: TransactionRecord) -> dict[str, Any]:
     if record.memo:
         props["Memo"] = _rich_text(record.memo)
 
-    if record.bank_category:
+    if record.bank_category is not None:
         props["Bank Category"] = _rich_text(record.bank_category)
 
     if record.category is not None:
@@ -75,7 +80,7 @@ def _build_properties(record: TransactionRecord) -> dict[str, Any]:
     if record.bank is not None:
         props["Bank"] = _select(record.bank.value)
 
-    if record.credit_card_account:
+    if record.credit_card_account is not None:
         props["Credit Card / Account"] = _select(record.credit_card_account)
 
     if record.card_network is not None:
@@ -99,24 +104,10 @@ def _build_properties(record: TransactionRecord) -> dict[str, Any]:
     if record.quantity is not None:
         props["Quantity"] = _number(record.quantity)
 
-    if record.ticker:
+    if record.ticker is not None:
         props["Ticker"] = _rich_text(record.ticker)
 
     if record.price_per_share is not None:
         props["Price Per Share"] = _number(record.price_per_share)
 
     return props
-
-
-def encode_for_create(record: TransactionRecord) -> dict[str, Any]:
-    """Return the full ``properties`` dict for POST /v1/pages."""
-    return _build_properties(record)
-
-
-def encode_for_update(record: TransactionRecord) -> dict[str, Any]:
-    """Return the ``properties`` dict for PATCH /v1/pages/{id}.
-
-    Same field set as create — Notion treats absent fields as "leave unchanged"
-    so omitting None/empty values is correct for both operations.
-    """
-    return _build_properties(record)
