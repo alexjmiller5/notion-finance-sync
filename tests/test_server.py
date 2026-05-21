@@ -142,6 +142,19 @@ class TestSyncAll:
         # The autouse stub for run_all_banks should have been called once
         app_module.run_all_banks.assert_awaited_once()
 
+    def test_run_all_banks_exception_still_returns_202(self, client, fake_registry, monkeypatch):
+        """When run_all_banks raises, the endpoint must still return 202.
+
+        BackgroundTasks failures must not propagate to the HTTP response; the
+        try/except in _run absorbs the exception and logs it instead.
+        """
+        from notion_finance_sync.server import app as app_module
+
+        app_module.run_all_banks.side_effect = RuntimeError("simulated crash")
+
+        response = client.post("/sync")
+        assert response.status_code == 202
+
 
 # ---------------------------------------------------------------------------
 # POST /sync/{session_id}
@@ -190,3 +203,16 @@ class TestSyncOne:
         response = client.post("/sync/DOES_NOT_EXIST")
         body = response.json()
         assert "DOES_NOT_EXIST" in body["detail"]
+
+    def test_run_one_bank_exception_still_returns_202(self, client, fake_registry, monkeypatch):
+        """When run_one_bank raises, the endpoint must still return 202.
+
+        BackgroundTasks failures must not propagate to the HTTP response; the
+        try/except in _run absorbs the exception and logs it instead.
+        """
+        from notion_finance_sync.server import app as app_module
+
+        app_module.run_one_bank.side_effect = RuntimeError("simulated crash")
+
+        response = client.post("/sync/fake_bank")
+        assert response.status_code == 202

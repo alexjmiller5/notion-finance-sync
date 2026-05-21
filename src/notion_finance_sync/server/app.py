@@ -45,16 +45,19 @@ async def sync_all(background_tasks: BackgroundTasks) -> dict:
     async def _run() -> None:
         log = logger.bind(sync_id=sync_id)
         log.info("background_sync_all_started")
-        results = await run_all_banks()
-        total_created = sum(r.transactions_created for r in results.values())
-        total_updated = sum(r.transactions_updated for r in results.values())
-        failed = [sid for sid, r in results.items() if r.status == "failure"]
-        log.info(
-            "background_sync_all_finished",
-            total_created=total_created,
-            total_updated=total_updated,
-            failed_banks=failed,
-        )
+        try:
+            results = await run_all_banks()
+            total_created = sum(r.transactions_created for r in results.values())
+            total_updated = sum(r.transactions_updated for r in results.values())
+            failed = [sid for sid, r in results.items() if r.status == "failure"]
+            log.info(
+                "background_sync_all_finished",
+                total_created=total_created,
+                total_updated=total_updated,
+                failed_banks=failed,
+            )
+        except Exception:
+            log.exception("background_sync_all_crashed")
 
     background_tasks.add_task(_run)
 
@@ -78,14 +81,17 @@ async def sync_one(session_id: str, background_tasks: BackgroundTasks) -> dict:
     async def _run() -> None:
         log = logger.bind(sync_id=sync_id, session_id=session_id)
         log.info("background_sync_one_started")
-        result = await run_one_bank(session_id)
-        log.info(
-            "background_sync_one_finished",
-            status=result.status,
-            created=result.transactions_created,
-            updated=result.transactions_updated,
-            error=result.error,
-        )
+        try:
+            result = await run_one_bank(session_id)
+            log.info(
+                "background_sync_one_finished",
+                status=result.status,
+                created=result.transactions_created,
+                updated=result.transactions_updated,
+                error=result.error,
+            )
+        except Exception:
+            log.exception("background_sync_one_crashed")
 
     background_tasks.add_task(_run)
 
