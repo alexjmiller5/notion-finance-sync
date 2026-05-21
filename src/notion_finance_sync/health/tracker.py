@@ -18,7 +18,7 @@ calls health.notion_task.create_failure_task() to escalate.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TypedDict
 
@@ -51,7 +51,7 @@ def _save(state: dict[str, BankHealth]) -> None:
 
 def record_success(session_id: str) -> None:
     state = _load()
-    now = datetime.now(tz=timezone.utc).isoformat()
+    now = datetime.now(tz=UTC).isoformat()
     state[session_id] = {
         "consecutive_failures_today": 0,
         "last_success": now,
@@ -66,8 +66,11 @@ def record_success(session_id: str) -> None:
 def record_failure(session_id: str, error: str) -> int:
     """Record a failure. Returns the new consecutive-failures-today count."""
     state = _load()
-    now = datetime.now(tz=timezone.utc)
-    today_iso = now.date().isoformat()
+    # Use local date (same source as needs_escalation) so the "same day" check
+    # is consistent regardless of UTC offset.  Timestamps (last_attempt, etc.)
+    # stay as UTC ISO strings because they are points in time, not calendar days.
+    today_iso = date.today().isoformat()
+    now_utc = datetime.now(tz=UTC).isoformat()
 
     existing = state.get(session_id, {})
     if existing.get("failure_day") != today_iso:
@@ -80,7 +83,7 @@ def record_failure(session_id: str, error: str) -> int:
         "consecutive_failures_today": count,
         "last_success": existing.get("last_success"),
         "last_error": error,
-        "last_attempt": now.isoformat(),
+        "last_attempt": now_utc,
         "failure_day": today_iso,
     }
     _save(state)

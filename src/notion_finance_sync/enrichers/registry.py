@@ -18,15 +18,3 @@ ENRICHER_REGISTRY: dict[str, Enricher] = {
     "bofa_rewards": bofa_rewards.BofARewardsEnricher(),
     "wells_rewards": wells_rewards.WellsRewardsEnricher(),
 }
-
-
-def get_enricher(source: str) -> Enricher:
-    """Look up an enricher by source name."""
-    try:
-        return ENRICHER_REGISTRY[source]
-    except KeyError as exc:
-        raise KeyError(f"unknown enricher source: {source!r}") from exc
-
-
-def all_sources() -> list[str]:
-    return list(ENRICHER_REGISTRY.keys())

@@ -104,25 +104,22 @@ async def run_one_bank(
     session_id: str,
     *,
     since: date | None = None,
-    skip_enrichers: bool = False,  # accepted for API symmetry, but enrichers
-    # only run from run_all_banks (Phase 2 is global, not per-bank).
     retry_pause_seconds: float = DEFAULT_RETRY_PAUSE_SECONDS,
 ) -> SyncResult:
     """Run the sync pipeline for a single bank session.
 
+    Enrichers are NOT run here — Phase 2 (enricher correlation) is global and
+    only runs from ``run_all_banks`` after all banks have succeeded.
+
     Args:
         session_id: Key into ``BANK_REGISTRY``. Raises ``KeyError`` if unknown.
         since: Lower bound for ``fetch_recent``. Defaults to today - 14 days.
-        skip_enrichers: Accepted but ignored at the per-bank level. Phase 2
-            (enrichers) only runs from ``run_all_banks``.
         retry_pause_seconds: Pause between retry attempts within this run.
             Defaults to ``DEFAULT_RETRY_PAUSE_SECONDS``; tests pass ``0``.
 
     Returns:
         ``SyncResult`` describing what happened.
     """
-    del skip_enrichers  # Phase 2 belongs to run_all_banks, not per-bank.
-
     scraper = bank_registry.get_scraper(session_id)
     if since is None:
         since = date.today() - timedelta(days=DEFAULT_LOOKBACK_DAYS)
@@ -229,7 +226,8 @@ async def _sync_one(
         )
 
     # All attempts exhausted.
-    assert last_error is not None  # narrow: the loop ran at least once
+    if last_error is None:
+        raise RuntimeError("retry loop exited without recording an error — invariant violated")
     count = record_failure(session_id, last_error)
     if needs_escalation(session_id):
         try:

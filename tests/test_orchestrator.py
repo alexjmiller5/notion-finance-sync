@@ -331,18 +331,29 @@ class TestOrphanRelease:
 
 class TestRetryAndEscalation:
     @staticmethod
-    def _force_escalation_threshold_reached(monkeypatch) -> None:
-        """Force ``needs_escalation`` to return True on this orchestrator run.
+    def _seed_prior_failures(count: int = 2) -> None:
+        """Pre-seed health.json with ``count`` prior failures for ``fake_bank``.
 
-        Pre-seeding ``data/health.json`` is fragile because ``tracker.record_failure``
-        derives ``failure_day`` from UTC time while ``needs_escalation`` uses local
-        time (a real bug in tracker.py, out of scope for this task — see report).
-        Tests of the orchestrator's *escalation path* sidestep that seam by stubbing
-        ``needs_escalation`` directly.
+        Both ``record_failure`` and ``needs_escalation`` now use ``date.today()``
+        as their date source, so a pre-seeded failure_day of today will correctly
+        trigger escalation when the run adds one more failure to reach the threshold.
         """
-        from notion_finance_sync.sync import orchestrator
+        import json
+        from datetime import date
 
-        monkeypatch.setattr(orchestrator, "needs_escalation", lambda session_id: True)
+        from notion_finance_sync.health import tracker
+
+        state = {
+            "fake_bank": {
+                "consecutive_failures_today": count,
+                "last_success": None,
+                "last_error": "prior error",
+                "last_attempt": "2026-05-19T00:00:00+00:00",
+                "failure_day": date.today().isoformat(),
+            }
+        }
+        tracker.HEALTH_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tracker.HEALTH_FILE.write_text(json.dumps(state))
 
     @pytest.mark.asyncio
     async def test_three_failures_escalates_and_records_failure(self, respx_mock, monkeypatch):
@@ -363,8 +374,8 @@ class TestRetryAndEscalation:
 
         monkeypatch.setattr(orchestrator, "record_failure", _spy_record_failure)
 
-        # Seed the tracker so this run's failure trips the threshold
-        self._force_escalation_threshold_reached(monkeypatch)
+        # Seed 2 prior failures so this run's 3rd failure trips the threshold
+        self._seed_prior_failures(count=2)
 
         # Task escalation routes — query returns no existing task, then create succeeds
         respx_mock.post(TASKS_QUERY_URL).mock(
@@ -394,7 +405,7 @@ class TestRetryAndEscalation:
 
         fake = FakeBankScraper(should_raise=RuntimeError("boom"))
         monkeypatch.setattr(registry, "BANK_REGISTRY", {"fake_bank": fake})
-        self._force_escalation_threshold_reached(monkeypatch)
+        self._seed_prior_failures(count=2)
 
         respx_mock.post(TASKS_QUERY_URL).mock(
             return_value=httpx.Response(200, json=_empty_query_response())
@@ -489,8 +500,8 @@ class TestRetryAndEscalation:
 
         fake = FakeBankScraper(should_raise=RuntimeError("scrape boom"))
         monkeypatch.setattr(registry, "BANK_REGISTRY", {"fake_bank": fake})
-        # Pre-seed so escalation fires (and exposes the broken tasks endpoint)
-        self._force_escalation_threshold_reached(monkeypatch)
+        # Pre-seed 2 prior failures so escalation fires (exposing the broken tasks endpoint)
+        self._seed_prior_failures(count=2)
 
         # Tasks endpoint blows up — orchestrator should swallow and continue
         respx_mock.post(TASKS_QUERY_URL).mock(
