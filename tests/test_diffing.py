@@ -148,7 +148,6 @@ class TestMaterialFieldTriggers:
         # Force a category string difference by setting existing category
         existing = {"src-1": _row("src-1", category="Dining")}
         result = build_transaction_changes(scraped=[record], existing=existing)
-        # record.category is None, existing is "Dining" — should be different
         assert len(result.to_update) == 1
 
     def test_bilt_partner_change_triggers_update(self):

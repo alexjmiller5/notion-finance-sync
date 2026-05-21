@@ -54,7 +54,7 @@ class TestRecordFailure:
         count = tracker.record_failure("bofa", "err3")
         assert count == 3
 
-    def test_new_day_resets_counter(self, tmp_path: Path):
+    def test_new_day_resets_counter(self):
         yesterday = (date.today() - timedelta(days=1)).isoformat()
         state = {
             "bofa": {
@@ -99,7 +99,7 @@ class TestNeedsEscalation:
     def test_false_for_unknown_session(self):
         assert tracker.needs_escalation("nonexistent") is False
 
-    def test_false_for_old_failure_day(self, tmp_path: Path):
+    def test_false_for_old_failure_day(self):
         yesterday = (date.today() - timedelta(days=1)).isoformat()
         state = {
             "bofa": {

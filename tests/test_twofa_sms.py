@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+import notion_finance_sync.twofa.sms as sms_mod
 from notion_finance_sync.twofa.sms import _apple_ts, _query_recent_messages, get_sms_code
 
 
@@ -96,14 +97,12 @@ class TestGetSmsCode:
     def test_code_found_via_patched_query(self, monkeypatch, chat_db: Path):
         _insert_message(chat_db, handle_id=1, text="Your BofA code is 123456", ts=AFTER)
 
-        import notion_finance_sync.twofa.sms as sms_mod
-
         original_query = _query_recent_messages
-
-        def _patched_query(after, sender_pattern, db_path=None):
-            return original_query(after, sender_pattern, db_path=chat_db)
-
-        monkeypatch.setattr(sms_mod, "_query_recent_messages", _patched_query)
+        monkeypatch.setattr(
+            sms_mod,
+            "_query_recent_messages",
+            lambda after, sp, db_path=None: original_query(after, sp, db_path=chat_db),
+        )
 
         code = get_sms_code(
             CUTOFF,
@@ -114,8 +113,6 @@ class TestGetSmsCode:
         assert code == "123456"
 
     def test_no_match_returns_none_after_timeout(self, monkeypatch, chat_db: Path):
-        import notion_finance_sync.twofa.sms as sms_mod
-
         def _patched_query(after, sender_pattern, db_path=None):
             return []
 
@@ -130,8 +127,6 @@ class TestGetSmsCode:
         assert code is None
 
     def test_custom_regex_matches_four_digit_code(self, monkeypatch, chat_db: Path):
-        import notion_finance_sync.twofa.sms as sms_mod
-
         def _patched_query(after, sender_pattern, db_path=None):
             return ["Your OTP is 8472"]
 
@@ -147,8 +142,6 @@ class TestGetSmsCode:
         assert code == "8472"
 
     def test_db_unreadable_returns_none(self, monkeypatch, tmp_path: Path):
-        import notion_finance_sync.twofa.sms as sms_mod
-
         # Point at a nonexistent file — SQLite will raise OperationalError
         missing = tmp_path / "nonexistent.db"
 
