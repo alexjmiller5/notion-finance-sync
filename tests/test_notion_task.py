@@ -16,8 +16,8 @@ import json
 import httpx
 import pytest
 
+from notion_finance_sync.config.settings import NOTION_TASKS_DATA_SOURCE_ID
 from notion_finance_sync.health.notion_task import (
-    TASKS_DATA_SOURCE_ID,
     TasksClient,
     _build_properties,
     create_failure_task,
@@ -29,7 +29,7 @@ SESSION_ID = "bofa"
 ERROR_SUMMARY = "Login page returned 503 after 30s"
 FAILURES = 3
 
-QUERY_URL = f"https://api.notion.com/v1/data_sources/{TASKS_DATA_SOURCE_ID}/query"
+QUERY_URL = f"https://api.notion.com/v1/data_sources/{NOTION_TASKS_DATA_SOURCE_ID}/query"
 PAGES_URL = "https://api.notion.com/v1/pages"
 
 
@@ -129,7 +129,7 @@ class TestCreateFailureTaskFirstCall:
         assert respx_mock.calls.call_count == 2
         create_call = respx_mock.calls[1]
         body = json.loads(create_call.request.content)
-        assert body["parent"] == {"data_source_id": TASKS_DATA_SOURCE_ID}
+        assert body["parent"] == {"data_source_id": NOTION_TASKS_DATA_SOURCE_ID}
 
     @pytest.mark.asyncio
     async def test_posted_body_has_correct_properties(self, respx_mock, monkeypatch):

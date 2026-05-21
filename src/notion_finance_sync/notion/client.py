@@ -10,7 +10,6 @@ Cherry-picked from the old notion-ai-budgeting-app and adapted:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import httpx
@@ -19,11 +18,9 @@ import structlog
 from notion_finance_sync.config.settings import NOTION_API_VERSION
 from notion_finance_sync.models.transactions import TransactionRecord
 from notion_finance_sync.notion.encoders import encode_transaction
+from notion_finance_sync.notion.http import request_with_retry
 
 logger = structlog.get_logger()
-
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 0.5
 
 
 class NotionClient:
@@ -40,23 +37,9 @@ class NotionClient:
 
     async def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """HTTP request with retry on 429 and timeout."""
-        for attempt in range(MAX_RETRIES):
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.request(method, url, headers=self._headers, **kwargs)
-                if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", RETRY_BASE_DELAY))
-                    delay = max(retry_after, RETRY_BASE_DELAY * (2**attempt))
-                    logger.warning("notion_rate_limited", attempt=attempt, delay=delay)
-                    await asyncio.sleep(delay)
-                    continue
-                response.raise_for_status()
-                return response
-            except httpx.TimeoutException:
-                delay = RETRY_BASE_DELAY * (2**attempt)
-                logger.warning("notion_timeout", attempt=attempt, delay=delay)
-                await asyncio.sleep(delay)
-        raise RuntimeError(f"Notion API request failed after {MAX_RETRIES} retries")
+        return await request_with_retry(
+            method, url, headers=self._headers, log_prefix="notion", **kwargs
+        )
 
     async def get_existing_transactions(
         self, since_date: str | None = None

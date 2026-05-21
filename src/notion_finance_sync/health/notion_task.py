@@ -5,7 +5,6 @@ Tasks DB data source ID: REDACTED_NOTION_TASKS_ID
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -17,13 +16,9 @@ from notion_finance_sync.config.settings import (
     NOTION_TASKS_DATA_SOURCE_ID,
     get_notion_api_key,
 )
+from notion_finance_sync.notion.http import request_with_retry
 
 logger = structlog.get_logger()
-
-TASKS_DATA_SOURCE_ID = NOTION_TASKS_DATA_SOURCE_ID
-
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 0.5
 
 
 class TasksClient:
@@ -37,23 +32,9 @@ class TasksClient:
         }
 
     async def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
-        for attempt in range(MAX_RETRIES):
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.request(method, url, headers=self._headers, **kwargs)
-                if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", RETRY_BASE_DELAY))
-                    delay = max(retry_after, RETRY_BASE_DELAY * (2**attempt))
-                    logger.warning("tasks_notion_rate_limited", attempt=attempt, delay=delay)
-                    await asyncio.sleep(delay)
-                    continue
-                response.raise_for_status()
-                return response
-            except httpx.TimeoutException:
-                delay = RETRY_BASE_DELAY * (2**attempt)
-                logger.warning("tasks_notion_timeout", attempt=attempt, delay=delay)
-                await asyncio.sleep(delay)
-        raise RuntimeError(f"Notion Tasks API request failed after {MAX_RETRIES} retries")
+        return await request_with_retry(
+            method, url, headers=self._headers, log_prefix="tasks_notion", **kwargs
+        )
 
     async def find_open_task(self, bank_display_name: str) -> dict[str, Any] | None:
         """Return the first To Do task matching the bank created in the last 24h, or None."""
@@ -65,11 +46,12 @@ class TasksClient:
                     {"property": "Date Created", "created_time": {"after": since}},
                 ]
             },
+            # 10 is plenty — more than 10 open To Do tasks/day would signal a bigger problem
             "page_size": 10,
         }
         response = await self._request_with_retry(
             "POST",
-            f"https://api.notion.com/v1/data_sources/{TASKS_DATA_SOURCE_ID}/query",
+            f"https://api.notion.com/v1/data_sources/{NOTION_TASKS_DATA_SOURCE_ID}/query",
             json=body,
         )
         data = response.json()
@@ -83,7 +65,7 @@ class TasksClient:
 
     async def create_task(self, properties: dict[str, Any]) -> None:
         body = {
-            "parent": {"data_source_id": TASKS_DATA_SOURCE_ID},
+            "parent": {"data_source_id": NOTION_TASKS_DATA_SOURCE_ID},
             "properties": properties,
         }
         await self._request_with_retry("POST", "https://api.notion.com/v1/pages", json=body)
