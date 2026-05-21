@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.alexmiller.notion-finance-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/alexmiller/.local/bin/uv</string>
+        <string>run</string>
+        <string>--directory</string>
+        <string>/Users/alexmiller/desktop/coding/active-projects/notion-finance-sync</string>
+        <string>python</string>
+        <string>scripts/sync.py</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- launchd doesn't have native jitter; the sync.py orchestrator should add ±20 min internally -->
+
+    <key>StandardOutPath</key>
+    <string>/Users/alexmiller/desktop/coding/active-projects/notion-finance-sync/data/launchd.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/alexmiller/desktop/coding/active-projects/notion-finance-sync/data/launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Keep the FastAPI server alive too (separate from the daily timer) -->
+    <!-- For a separate server plist, create a second .plist; this one is just the daily timer. -->
+</dict>
+</plist>

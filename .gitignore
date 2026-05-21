@@ -1,0 +1,31 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Per-bank Chrome user-data directories (cookies, profile, device-trust state)
+data/sessions/
+
+# Statement PDFs (sensitive financial data)
+data/statements/
+
+# Manual-entry CSVs for closed accounts
+data/manual/
+
+# Snapshotted HTML/JSON from each run for debugging
+data/snapshots/
+
+# Persistent health tracker + reward pool state
+data/health.json
+data/card_quarterly_pools.json
+
+# Per-card reward rules (contains current choice categories, tier — personal)
+config/cards.yaml
+
+# macOS
+.DS_Store
