@@ -171,6 +171,8 @@ notion-finance-sync/
 | `Price Per Share` | number (dollar) | Cost basis per share |
 | `Bilt Points` | number | Cross-card Bilt rewards (orthogonal to `Calculated`/`True`) |
 | `Bilt Partner` | checkbox | Merchant is a Bilt Neighborhood Dining partner |
+| `Excluded from Spending` | checkbox | True = absorbed by a `Related Transactions` link; filtered out of spending category sums |
+| `Review Status` | status | `Needs Review` / `Reviewed` / `Needs Attention` — drives manual-review queues |
 
 **Select option additions:**
 - `Bank`: add `Venmo`, `E*Trade`, `Fidelity` (BofA investment accounts stay under existing `Bank of America`)
@@ -348,7 +350,7 @@ Same sync flow, but pauses at any "needs human" wall (unsolvable CAPTCHA, novel 
 `Airfare` · `Travel` · `Dining` · `Groceries` · `Gas` · `Streaming` · `Online Shopping` · `Convenience` · `Department Stores` · `Wholesale Clubs` · `Transit`
 
 **Functional:**
-`Bills & Utilities` · `Healthcare` · `Cash & ATM` · `Transfer` · `Income` · `Rent` · `Other`
+`Bills & Utilities` · `Healthcare` · `Cash & ATM` · `Transfer` · `Trip Settlement` · `Income` · `Rent` · `Other`
 
 **Notable choices:**
 - `Airfare` split from `Travel` (different reward tiers on most cards)
@@ -470,6 +472,53 @@ Correlation primitive: fuzzy match by `(date, amount, merchant_normalized)`. Reu
 - IRA rollovers (Fidelity transfer-out ↔ BofA Roth IRA transfer-in)
 
 **For most transactions** (`Related Transactions` empty), `Net Amount = Transaction Amount` automatically. Zero workflow change.
+
+### The bidirectional-relation math problem (and the `Excluded from Spending` fix)
+
+Notion self-relations are bidirectional, so when you link a $-100 BofA Dining to 4 Venmo receipts of $+20 each, BOTH sides see the relation. The `Net Amount` formula gives the right answer on the BofA Dining row (-$100 + $80 = -$20) but a misleading answer on each Venmo receipt (+$20 + -$100 = -$80). Summing `Net Amount` across all 5 rows yields -$340 instead of the true -$20.
+
+**Fix:** `Excluded from Spending` checkbox (default false). Set it true on the "consumed" side of any relation:
+
+| Pattern | Set `Excluded` on |
+|---|---|
+| Reimbursement (BofA Dining + 4 Venmo receipts) | The 4 Venmo receipts |
+| Refund (purchase + refund) | The refund row (or the purchase if the refund is the canonical event) |
+| Internal transfer (BofA Checking → BofA Savings) | The destination side (source already gets `Category=Transfer`) |
+| IRA rollover (Fidelity transfer-out + BofA Roth transfer-in) | Both legs |
+| Trip settlement (Splitwise-style end-of-trip Venmos) | The settlement Venmos (use `Trips` relation to group) |
+
+Spending category sums filter on `Excluded from Spending = false`. Math then works correctly.
+
+### Trip settlement specifics
+
+When your group uses Splitwise (or similar) on a trip and settles via one or several end-of-trip Venmos:
+- Every individual card swipe during the trip: `Trips = <Trip Page>`, real `Category`, normal `Net Amount`.
+- The settlement Venmo from each friend: `Trips = <Trip Page>`, `Category = Trip Settlement`, `Excluded from Spending = true`.
+- The `Trips` relation groups everything at the Trip page level; don't bother linking each settlement Venmo to specific txns via `Related Transactions`. Splitwise is the source of truth for "what's my share"; this DB just records the money flow.
+
+---
+
+## 14b. Review Status — the manual-review workflow primitive
+
+`Review Status` is a status field (Needs Review / Reviewed / Needs Attention) that drives the unreviewed-queue workflow. The scraper sets a default at write time via `compute_review_status(record)`:
+
+| Condition | Default |
+|---|---|
+| `category is None` (Venmo, PDF-sourced, anything unmapped) | `Needs Review` |
+| `amount > 0` on a Credit Card or Debit Card | `Needs Review` (likely refund) |
+| Anything else | `Reviewed` (trust the bank category) |
+
+Investment-account positive amounts (Brokerage / IRA / 401k) are NOT flagged — dividends and grants are normal there.
+
+**User workflow:** build Notion views per queue you care about:
+- Uncategorized Venmos: `Bank = Venmo AND Review Status = Needs Review`
+- PDF-sourced needs review: `Bank Category is empty AND Review Status = Needs Review`
+- Trip-link queue: `Trips is empty AND Transaction Date within an active trip range`
+- Rewards divergence: `abs(True Rewards - Calculated Rewards) > $0.50`
+
+Sweep, categorize, flip to `Reviewed`. Always a finite queue.
+
+**Future enhancement (out of v1):** AI pipeline (e.g., Gemini) for refund auto-detection — for any positive-amount card txn, look for a matching merchant negative txn in the last 30 days, suggest linking + Excluded-from-Spending flag with a confidence score.
 
 ---
 

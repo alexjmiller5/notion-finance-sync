@@ -43,7 +43,7 @@ RENAMES: dict[str, str] = {
 NEW_BANK_OPTIONS: list[str] = ["Venmo", "E*Trade", "Fidelity"]
 NEW_ACCOUNT_TYPE_OPTIONS: list[str] = ["P2P", "Brokerage", "401k", "IRA"]
 
-# Canonical 18-category taxonomy (§10 of SPEC)
+# Canonical 19-category taxonomy (§10 of SPEC)
 CATEGORY_OPTIONS: list[str] = [
     "Airfare",
     "Travel",
@@ -60,10 +60,14 @@ CATEGORY_OPTIONS: list[str] = [
     "Healthcare",
     "Cash & ATM",
     "Transfer",
+    "Trip Settlement",
     "Income",
     "Rent",
     "Other",
 ]
+
+# Review Status options for the new "Review Status" status field
+REVIEW_STATUS_OPTIONS: list[str] = ["Needs Review", "Reviewed", "Needs Attention"]
 
 
 def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
@@ -125,6 +129,16 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
         "Bilt Partner": {
             "type": "checkbox",
             "checkbox": {},
+        },
+        "Excluded from Spending": {
+            "type": "checkbox",
+            "checkbox": {},
+        },
+        "Review Status": {
+            "type": "status",
+            "status": {
+                "options": [{"name": opt} for opt in REVIEW_STATUS_OPTIONS],
+            },
         },
     }
 

@@ -222,6 +222,24 @@ def make_schema(
             "type": "checkbox",
             "checkbox": {},
         }
+        properties["Excluded from Spending"] = {
+            "id": "exs",
+            "name": "Excluded from Spending",
+            "type": "checkbox",
+            "checkbox": {},
+        }
+        properties["Review Status"] = {
+            "id": "rvs",
+            "name": "Review Status",
+            "type": "status",
+            "status": {
+                "options": [
+                    {"id": "1", "name": "Needs Review"},
+                    {"id": "2", "name": "Reviewed"},
+                    {"id": "3", "name": "Needs Attention"},
+                ],
+            },
+        }
 
     return {"object": "data_source", "id": DATA_SOURCE_ID, "properties": properties}
 

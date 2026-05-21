@@ -6,8 +6,10 @@ from notion_finance_sync.models.transactions import (
     CardNetwork,
     CategoryMap,
     HoldingSnapshot,
+    ReviewStatus,
     TransactionRecord,
     TransactionStatus,
+    compute_review_status,
 )
 
 __all__ = [
@@ -18,6 +20,8 @@ __all__ = [
     "CardNetwork",
     "CategoryMap",
     "HoldingSnapshot",
+    "ReviewStatus",
     "TransactionRecord",
     "TransactionStatus",
+    "compute_review_status",
 ]

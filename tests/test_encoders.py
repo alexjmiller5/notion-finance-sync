@@ -348,6 +348,42 @@ class TestCheckboxAlwaysEmitted:
         assert "Bilt Partner" in props
         assert props["Bilt Partner"] == {"checkbox": True}
 
+    def test_excluded_from_spending_false_emitted(self):
+        record = make_sparse_record()
+        assert record.excluded_from_spending is False
+        props = encode_transaction(record)
+        assert props["Excluded from Spending"] == {"checkbox": False}
+
+    def test_excluded_from_spending_true_emitted(self):
+        record = make_sparse_record()
+        record.excluded_from_spending = True
+        props = encode_transaction(record)
+        assert props["Excluded from Spending"] == {"checkbox": True}
+
+
+class TestReviewStatusEncoding:
+    def test_review_status_omitted_when_none(self):
+        record = make_sparse_record()
+        assert record.review_status is None
+        props = encode_transaction(record)
+        assert "Review Status" not in props
+
+    def test_review_status_emitted_when_set(self):
+        from notion_finance_sync.models import ReviewStatus
+
+        record = make_sparse_record()
+        record.review_status = ReviewStatus.NEEDS_REVIEW
+        props = encode_transaction(record)
+        assert props["Review Status"] == {"status": {"name": "Needs Review"}}
+
+    def test_review_status_reviewed_value(self):
+        from notion_finance_sync.models import ReviewStatus
+
+        record = make_sparse_record()
+        record.review_status = ReviewStatus.REVIEWED
+        props = encode_transaction(record)
+        assert props["Review Status"] == {"status": {"name": "Reviewed"}}
+
 
 # ---------------------------------------------------------------------------
 # Tests: encode_transaction

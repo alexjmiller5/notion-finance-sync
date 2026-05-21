@@ -61,6 +61,7 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
     props["Source Account ID"] = _rich_text(record.source_account_id)
 
     props["Bilt Partner"] = _checkbox(record.bilt_partner)
+    props["Excluded from Spending"] = _checkbox(record.excluded_from_spending)
 
     if record.transacted_at is not None:
         props["Transacted At"] = _date(record.transacted_at.isoformat())
@@ -109,5 +110,8 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
 
     if record.price_per_share is not None:
         props["Price Per Share"] = _number(record.price_per_share)
+
+    if record.review_status is not None:
+        props["Review Status"] = _status(record.review_status.value)
 
     return props

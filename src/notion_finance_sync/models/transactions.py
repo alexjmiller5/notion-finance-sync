@@ -1,13 +1,24 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Literal
 
 
 class TransactionStatus(StrEnum):
     PENDING = "Pending"
     POSTED = "Posted"
     RELEASED = "Released"
+
+
+class ReviewStatus(StrEnum):
+    """User-facing review state. Drives the 'unreviewed' workflow queues.
+
+    Distinct from `TransactionStatus` (which tracks the bank-side state
+    Pending/Posted/Released).
+    """
+
+    NEEDS_REVIEW = "Needs Review"
+    REVIEWED = "Reviewed"
+    NEEDS_ATTENTION = "Needs Attention"
 
 
 class BankName(StrEnum):
@@ -53,6 +64,7 @@ class CanonicalCategory(StrEnum):
     HEALTHCARE = "Healthcare"
     CASH_ATM = "Cash & ATM"
     TRANSFER = "Transfer"
+    TRIP_SETTLEMENT = "Trip Settlement"
     INCOME = "Income"
     RENT = "Rent"
     OTHER = "Other"
@@ -145,10 +157,46 @@ class TransactionRecord:
     price_per_share: float | None = None
 
     # ------------------------------------------------------------------
+    # Manual-review workflow
+    # ------------------------------------------------------------------
+    review_status: ReviewStatus | None = None
+    """User-facing review state. None means 'let compute_review_status pick a default'."""
+
+    excluded_from_spending: bool = False
+    """When true, this row is absorbed by a Related Transactions link and should be
+    filtered out of spending category sums. Examples: reimbursement Venmo receipts,
+    refund rows (the refund side), IRA rollover legs, internal-transfer destinations,
+    trip-settlement Venmos."""
+
+    # ------------------------------------------------------------------
     # Metadata
     # ------------------------------------------------------------------
     raw_data: dict = field(default_factory=dict)
     """Original scraped data dict. Useful for debugging and reparseability."""
+
+
+def compute_review_status(record: TransactionRecord) -> ReviewStatus:
+    """Default Review Status for a freshly-scraped record.
+
+    Rules (highest precedence first):
+    1. Category null  -> Needs Review (Venmo, PDF-sourced, anything we couldn't map)
+    2. Positive amount on a card  -> Needs Review (likely refund; user should confirm
+       and link via Related Transactions if appropriate)
+    3. Otherwise  -> Reviewed (trust the bank-supplied category)
+
+    Investment accounts (Brokerage / IRA / 401k) are NOT flagged by rule 2 — positive
+    amounts there are normal (dividends, grants).
+    """
+    if record.category is None:
+        return ReviewStatus.NEEDS_REVIEW
+
+    if record.amount > 0 and record.account_type in (
+        AccountType.CREDIT_CARD,
+        AccountType.DEBIT_CARD,
+    ):
+        return ReviewStatus.NEEDS_REVIEW
+
+    return ReviewStatus.REVIEWED
 
 
 @dataclass

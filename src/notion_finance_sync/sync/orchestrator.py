@@ -49,6 +49,7 @@ from notion_finance_sync.health.tracker import (
     record_failure,
     record_success,
 )
+from notion_finance_sync.models import compute_review_status
 from notion_finance_sync.notion.client import NotionClient
 from notion_finance_sync.sync.diffing import build_transaction_changes
 from notion_finance_sync.sync.orphan import detect_orphans, filter_pending
@@ -283,10 +284,17 @@ async def _run_one_attempt(
     # 3. Diff
     changes = build_transaction_changes(scraped=scraped, existing=existing)
 
-    # 4. Apply creates + updates
+    # 4. Apply creates + updates. Default Review Status per the heuristic
+    #    (Venmo / PDF / refund-shaped txns -> Needs Review; rest -> Reviewed).
+    #    The scraper may set review_status explicitly for special cases; only
+    #    fill in when None.
     for record in changes.to_create:
+        if record.review_status is None:
+            record.review_status = compute_review_status(record)
         await client.create_from_record(record)
     for page_id, record in changes.to_update:
+        if record.review_status is None:
+            record.review_status = compute_review_status(record)
         await client.update_from_record(page_id, record)
 
     # 5. Orphan release (only after a clean scrape — see SPEC §9)
