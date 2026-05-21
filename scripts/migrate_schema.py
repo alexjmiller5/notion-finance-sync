@@ -56,14 +56,13 @@ from notion_finance_sync.config.settings import (
     get_notion_api_key,
 )
 from notion_finance_sync.notion.migrations import (
+    _NOTION_BASE,
     MigrationPlan,
     apply_migration_plan,
     compute_migration_plan,
 )
 
 logger = structlog.get_logger()
-
-_NOTION_BASE = "https://api.notion.com"
 
 
 async def fetch_schema(api_key: str, data_source_id: str) -> dict:
@@ -77,7 +76,7 @@ async def fetch_schema(api_key: str, data_source_id: str) -> dict:
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.get(url, headers=headers)
         response.raise_for_status()
-    return response.json()
+        return response.json()
 
 
 def _print_plan(plan: MigrationPlan, dry_run: bool) -> None:
@@ -116,14 +115,12 @@ async def main() -> int:
         data_source_id=NOTION_TRANSACTIONS_DATA_SOURCE_ID,
     )
 
-    # Resolve API key
     try:
         api_key = get_notion_api_key()
     except Exception as exc:
         logger.error("migration_api_key_error", error=str(exc))
         return 1
 
-    # Fetch current schema
     logger.info("migration_fetching_schema")
     try:
         schema = await fetch_schema(api_key, NOTION_TRANSACTIONS_DATA_SOURCE_ID)
@@ -131,10 +128,7 @@ async def main() -> int:
         logger.error("migration_fetch_failed", error=str(exc))
         return 1
 
-    # Compute plan
     plan = compute_migration_plan(schema, data_source_id=NOTION_TRANSACTIONS_DATA_SOURCE_ID)
-
-    # Print summary
     _print_plan(plan, dry_run=args.dry_run)
 
     if plan.is_empty():
@@ -145,7 +139,6 @@ async def main() -> int:
         logger.info("migration_dry_run_complete", message="No changes applied (--dry-run).")
         return 0
 
-    # Confirm before applying
     try:
         answer = input("Proceed? [y/N]: ").strip().lower()
     except (EOFError, KeyboardInterrupt):
@@ -157,7 +150,6 @@ async def main() -> int:
         logger.info("migration_aborted", reason="user declined")
         return 0
 
-    # Apply
     try:
         await apply_migration_plan(
             plan,

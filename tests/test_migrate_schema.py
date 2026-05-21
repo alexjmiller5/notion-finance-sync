@@ -402,7 +402,6 @@ class TestApplyMigrationPlanDryRun:
             ],
             category_options=CATEGORY_OPTIONS,
         )
-        respx_mock.get(SCHEMA_URL).mock(return_value=httpx.Response(200, json=schema))
         patch_route = respx_mock.patch(SCHEMA_URL)
 
         plan = compute_migration_plan(schema, data_source_id=DATA_SOURCE_ID)

@@ -28,9 +28,7 @@ from notion_finance_sync.config.settings import NOTION_API_VERSION
 
 logger = structlog.get_logger()
 
-# ---------------------------------------------------------------------------
 # Constants — canonical schema definition
-# ---------------------------------------------------------------------------
 
 # The exact formula expression for Net Amount (must match this string exactly)
 NET_AMOUNT_FORMULA = 'prop("Transaction Amount") + prop("Related Transactions Amount")'
@@ -131,24 +129,13 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
     }
 
 
-# ---------------------------------------------------------------------------
-# MigrationPlan dataclass
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class MigrationPlan:
     """Computed set of changes to apply to the data-source schema.
 
-    Attributes:
-        renames: {current_name: new_name} for properties to rename.
-        new_properties: {prop_name: property_schema} for properties to create.
-        select_options: {prop_name: [option_name, ...]} for NEW options to add
-            (the existing options are stored in current_select_options and merged
-            at apply time).
-        current_select_options: {prop_name: [existing_option_dict, ...]} raw
-            Notion option objects (with id/name/color) from the current schema,
-            needed to produce a complete merged list for PATCH.
+    ``current_select_options`` holds raw Notion option objects (with id/name/color)
+    from the current schema; these are merged with the new option names at apply
+    time to produce a complete list for the PATCH body.
     """
 
     renames: dict[str, str] = field(default_factory=dict)
@@ -171,11 +158,6 @@ class MigrationPlan:
         return lines
 
 
-# ---------------------------------------------------------------------------
-# compute_migration_plan
-# ---------------------------------------------------------------------------
-
-
 def compute_migration_plan(schema: dict[str, Any], *, data_source_id: str) -> MigrationPlan:
     """Inspect *schema* (a GET /v1/data_sources/{id} response body) and return
     the minimal set of changes required to reach the target schema.
@@ -186,7 +168,6 @@ def compute_migration_plan(schema: dict[str, Any], *, data_source_id: str) -> Mi
     existing_props: dict[str, Any] = schema.get("properties", {})
     existing_names: set[str] = set(existing_props.keys())
 
-    # --- 1. Renames ----------------------------------------------------------
     renames: dict[str, str] = {}
     for old, new in RENAMES.items():
         if old in existing_names:
@@ -200,7 +181,6 @@ def compute_migration_plan(schema: dict[str, Any], *, data_source_id: str) -> Mi
                 reason="already renamed or missing",
             )
 
-    # --- 2. New properties ---------------------------------------------------
     new_props_spec = _new_properties_spec(data_source_id)
     new_properties: dict[str, dict[str, Any]] = {}
     for name, schema_obj in new_props_spec.items():
@@ -210,7 +190,6 @@ def compute_migration_plan(schema: dict[str, Any], *, data_source_id: str) -> Mi
         else:
             logger.debug("migration_add_property_skipped", name=name, reason="already exists")
 
-    # --- 3. Select options ---------------------------------------------------
     # Targets: {prop_name: [option_name, ...]} of what we want to add
     targets: dict[str, list[str]] = {
         "Bank": NEW_BANK_OPTIONS,
@@ -247,10 +226,6 @@ def compute_migration_plan(schema: dict[str, Any], *, data_source_id: str) -> Mi
     )
 
 
-# ---------------------------------------------------------------------------
-# apply_migration_plan
-# ---------------------------------------------------------------------------
-
 _NOTION_BASE = "https://api.notion.com"
 
 
@@ -275,20 +250,17 @@ async def apply_migration_plan(
         logger.info("migration_dry_run_no_changes_applied")
         return
 
-    # Build the merged PATCH body
     properties_patch: dict[str, Any] = {}
 
-    # Renames
     for old, new in plan.renames.items():
         properties_patch[old] = {"name": new}
         logger.info("migration_rename", old=old, new=new)
 
-    # New properties
     for name, schema_obj in plan.new_properties.items():
         properties_patch[name] = schema_obj
         logger.info("migration_add_property", name=name, type=schema_obj.get("type"))
 
-    # Select option additions — merge existing + new
+    # Merge existing + new options to produce the complete list for PATCH
     for prop_name, new_option_names in plan.select_options.items():
         existing_objs = plan.current_select_options.get(prop_name, [])
         merged = list(existing_objs) + [{"name": o, "color": "default"} for o in new_option_names]
