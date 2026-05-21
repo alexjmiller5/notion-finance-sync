@@ -30,6 +30,10 @@ migrate:
 migrate-dry-run:
     uv run python scripts/migrate_schema.py --dry-run
 
+# End-to-end demo: FakeBank → orchestrator → Notion → cleanup
+demo:
+    PYTHONPATH="src:tests" uv run python scripts/demo_fake_bank.py
+
 # Start the FastAPI HTTP server (foreground)
 serve:
     uv run uvicorn notion_finance_sync.server.app:app --host 127.0.0.1 --port 8765
