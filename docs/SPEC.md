@@ -188,7 +188,7 @@ notion-finance-sync/
 | Bank of America | `banks/bofa.py` + `banks/bofa_investments.py` | All BofA cards (AQHA, Komen, Travel Rewards, Unlimited Cash Rewards, NEA, Advantage Plus) + Checking + Savings + **Roth IRA** + **Investment Management** | High priority. One login, many accounts. |
 | U.S. Bank | `banks/us_bank.py` | Cash+ Visa Signature + Harris Teeter Rewards | High priority. `True Rewards` deliberately null. |
 | Wells Fargo | `banks/wells_fargo.py` | Autograph card (current) + historical old-Bilt-era transactions | Lower priority. |
-| Bilt | `banks/bilt.py` | Bilt Blue card + Bilt portal session | Lower priority. Bilt portal feeds cross-card enricher. |
+| Bilt | `banks/bilt.py` | Bilt Blue card + Bilt portal session | Lower priority. Bilt portal feeds cross-card enricher. **Long-lived session** — Alex rarely re-logs on personal devices; Bilt verifies via SMS to phone, no username/password in 1Password. |
 | Everbank | `banks/everbank.py` | Checking | High priority. |
 | Venmo | `banks/venmo.py` | Venmo account | High priority. |
 | E*Trade | `banks/etrade.py` | Brokerage (monthly RSU vests) | High priority. |
@@ -276,7 +276,7 @@ Don't mix stacks within a single bank — pick one tool per bank module.
 
 **Two shared functions:**
 - `twofa/sms.py::get_sms_code(after, sender_pattern, code_regex, timeout_s)` — reads `~/Library/Messages/chat.db`
-- `twofa/email.py::get_email_code(after, sender_pattern, code_regex, timeout_s)` — reads Gmail (auth via OAuth client credentials in 1Password)
+- `twofa/email.py::get_email_code(after, sender_pattern, code_regex, timeout_s)` — reads Gmail via IMAP using an App Password (not OAuth). Simpler than OAuth for a single-user personal project; app password lives at `op://Notion Finance Sync/Gmail App Password/credential`.
 
 **Per-bank config** declares which method + sender pattern + code regex per bank. Bank scrapers, after submitting credentials, detect the 2FA page and call the configured function.
 
@@ -611,14 +611,21 @@ Documented in README:
 
 1. **Install dependencies:** `uv sync`
 2. **1Password CLI configured** (`op` command works, signed in to relevant vault)
-3. **Per-bank 1Password items** — for each `session_id`, create item at `op://Personal/{Session Display Name}` with `username` + `password` fields. Examples:
-   - `op://Personal/BofA/username`, `op://Personal/BofA/password`
-   - `op://Personal/Wells Fargo/username`, `op://Personal/Wells Fargo/password`
-4. **Notion API integration secret** at `op://Personal/Notion Finance Sync/credential`
-5. **Gmail OAuth client credentials** at `op://Personal/Gmail OAuth/{client_id,client_secret,refresh_token}` (for Gmail 2FA code reading)
-6. **Full Disk Access** granted to terminal / Python interpreter in System Settings → Privacy & Security → Full Disk Access (for Messages.app SQLite reads)
-7. **Run schema migration once:** `just migrate`
-8. **First daily run** — schedule via `just install-launchd` (places the plist + loads it)
+3. **Project-scoped 1Password vault** named `Notion Finance Sync` (created via `op vault create`). Service account `notion-finance-sync-svc` has read+write scoped only to this vault. Service-account token lives in Personal vault at `op://Personal/Notion Finance Sync Service Account Token/password`.
+4. **Per-bank 1Password items** in the project vault. The session_id-to-item mapping lives in `settings.OP_BANK_ITEM_BY_SESSION`. Required items:
+   - `op://Notion Finance Sync/BofA/{username,password}` (covers all BofA accounts incl. investment + IRA — one login)
+   - `op://Notion Finance Sync/Wells Fargo/{username,password}`
+   - `op://Notion Finance Sync/U.S. Bank/{username,password}`
+   - `op://Notion Finance Sync/Everbank/{username,password}`
+   - `op://Notion Finance Sync/Venmo/{username,password}`
+   - `op://Notion Finance Sync/E*Trade/{username,password}`
+   - `op://Notion Finance Sync/Fidelity/{username,password}`
+   - **Bilt deliberately omitted** — Bilt uses SMS-to-phone verification (no username/password flow), and sessions are long-lived on personal devices. Once `data/sessions/bilt/` is established the scraper usually proceeds without any 2FA. Phone-verification handler kicks in if a fresh challenge appears.
+5. **Notion API integration secret** at `op://Notion Finance Sync/Notion Finance Sync Notion Internal Integration Secret/credential`
+6. **Gmail App Password** at `op://Notion Finance Sync/Gmail App Password/credential`. Used for IMAP access to read 2FA codes from bank emails. App passwords are created in **Google Account → Security → App Passwords** (requires 2FA enabled on the Google account).
+7. **Full Disk Access** granted to terminal / Python interpreter in System Settings → Privacy & Security → Full Disk Access (for Messages.app SQLite reads)
+8. **Run schema migration once:** `just migrate`
+9. **First daily run** — schedule via `just install-launchd` (places the plist + loads it). The launchd plist sets `PYTHONPATH=src` so the editable install works without an active `uv run` context.
 
 ---
 

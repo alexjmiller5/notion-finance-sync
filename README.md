@@ -60,18 +60,25 @@ vaults — no env var needed.
 
 ### 4. Populate per-bank credentials in the Notion Finance Sync vault
 
-For each session you intend to sync, create a 1Password Login item in the
-`Notion Finance Sync` vault with `username` and `password` fields.
+For each session that needs login automation, create a 1Password Login item
+in the `Notion Finance Sync` vault with `username` and `password` fields.
 
 Required items (one per active session):
-- `op://Notion Finance Sync/BofA/{username,password}`
+- `op://Notion Finance Sync/BofA/{username,password}` — covers BofA cards + checking + savings + Roth IRA + Investment Mgmt (one login)
 - `op://Notion Finance Sync/Wells Fargo/{username,password}`
 - `op://Notion Finance Sync/U.S. Bank/{username,password}`
-- `op://Notion Finance Sync/Bilt/{username,password}`
 - `op://Notion Finance Sync/Everbank/{username,password}`
 - `op://Notion Finance Sync/Venmo/{username,password}`
 - `op://Notion Finance Sync/E*Trade/{username,password}`
 - `op://Notion Finance Sync/Fidelity/{username,password}`
+
+**Bilt is intentionally NOT in this list.** Bilt verifies by sending an SMS
+code to Alex's phone number — there's no username/password flow to automate.
+Bilt sessions are also long-lived on personal devices (Alex rarely has to
+re-login), so once the persistent profile at `data/sessions/bilt/` is
+established the scraper can usually proceed without any 2FA step at all.
+The Bilt scraper module handles the phone-verification fallback if it does
+get prompted.
 
 CLI shortcut for one (repeat per bank, replacing placeholders):
 ```bash
@@ -84,31 +91,22 @@ Or use the 1Password app/web UI.
 
 ### 5. Notion API integration secret
 
-Create a Notion internal integration scoped to the Transactions database, then store the secret in the project vault:
+Create a Notion internal integration scoped to the Transactions database, then store the secret in the project vault as a Password or API Credential item titled `Notion Finance Sync Notion Internal Integration Secret` with a `credential` field.
 
-```bash
-op item create --category=password --vault="Notion Finance Sync" \
-  --title="Notion API Key" credential="secret_xxxxxxxxxxxx"
-```
+Reference path: `op://Notion Finance Sync/Notion Finance Sync Notion Internal Integration Secret/credential`
 
-Reference path: `op://Notion Finance Sync/Notion API Key/credential`
+### 6. Gmail App Password for email 2FA reading
 
-### 6. Gmail OAuth for email 2FA reading
+The email 2FA reader uses Gmail's IMAP gateway with an App Password (not OAuth).
 
-Create an OAuth 2.0 desktop client in Google Cloud Console (Gmail API scope: `gmail.readonly`), then store credentials in the project vault:
+1. Enable 2FA on your Google account.
+2. Go to **Account → Security → App Passwords**.
+3. Create a new app password named `notion-finance-sync`.
+4. Store the 16-character output in 1Password as a Password or API Credential item titled `Gmail App Password` with a `credential` field.
 
-```bash
-op item create --category="api credential" --vault="Notion Finance Sync" \
-  --title="Gmail OAuth" \
-  client_id="..." client_secret="..." refresh_token="..."
-```
+Reference path: `op://Notion Finance Sync/Gmail App Password/credential`
 
-(One-time browser auth flow generates the refresh token. A helper script in `scripts/` will do this the first time you run the email handler.)
-
-Reference paths:
-- `op://Notion Finance Sync/Gmail OAuth/client_id`
-- `op://Notion Finance Sync/Gmail OAuth/client_secret`
-- `op://Notion Finance Sync/Gmail OAuth/refresh_token`
+The Gmail address itself is read from the `GMAIL_ADDRESS` env var (defaults to `[redacted-email]` if unset).
 
 ### 7. Full Disk Access for Messages.app SQLite
 

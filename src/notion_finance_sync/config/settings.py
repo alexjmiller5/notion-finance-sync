@@ -42,10 +42,28 @@ NOTION_TASKS_DATA_SOURCE_ID = "REDACTED_NOTION_TASKS_ID"
 # 1Password vault name (project-scoped)
 OP_VAULT = "Notion Finance Sync"
 
-# 1Password item path for the service-account token (stored in Personal vault)
-OP_SERVICE_ACCOUNT_TOKEN_REF = (
-    "op://Personal/Notion Finance Sync Service Account Token/password"
-)
+# 1Password item path for the service-account token (stored in Personal vault).
+# Used by the unattended (launchd) entry point to export OP_SERVICE_ACCOUNT_TOKEN
+# before invoking sync.
+OP_SERVICE_ACCOUNT_TOKEN_REF = "op://Personal/Notion Finance Sync Service Account Token/password"
+
+# Canonical 1Password item names per session_id.
+# Wells Fargo, Notion API secret, and Gmail App Password names match exactly.
+# The bank logins each have username + password fields.
+OP_BANK_ITEM_BY_SESSION: dict[str, str] = {
+    "bofa": "BofA",
+    "bofa_investments": "BofA",  # shares the BofA login
+    "wells_fargo": "Wells Fargo",
+    "us_bank": "U.S. Bank",
+    "everbank": "Everbank",
+    "venmo": "Venmo",
+    "etrade": "E*Trade",
+    "fidelity": "Fidelity",
+    # NB: Bilt is NOT in the vault. Bilt sessions are long-lived (auth by SMS to
+    # Alex's phone, persistent device-trust on personal devices). When/if a fresh
+    # login is needed, the scraper hits the phone-verification flow rather than
+    # username+password from 1Password.
+}
 
 
 # ---------------------------------------------------------------------------
@@ -75,38 +93,65 @@ def _resolve(env_var: str, op_reference: str) -> str:
 # ---------------------------------------------------------------------------
 @cache
 def get_notion_api_key() -> str:
-    return _resolve("NOTION_API_KEY", f"op://{OP_VAULT}/Notion API Key/credential")
-
-
-@cache
-def get_gmail_client_id() -> str:
-    return _resolve("GMAIL_CLIENT_ID", f"op://{OP_VAULT}/Gmail OAuth/client_id")
-
-
-@cache
-def get_gmail_client_secret() -> str:
-    return _resolve("GMAIL_CLIENT_SECRET", f"op://{OP_VAULT}/Gmail OAuth/client_secret")
-
-
-@cache
-def get_gmail_refresh_token() -> str:
-    return _resolve("GMAIL_REFRESH_TOKEN", f"op://{OP_VAULT}/Gmail OAuth/refresh_token")
-
-
-def get_bank_username(session_display_name: str) -> str:
-    """Read a per-bank username. `session_display_name` is the 1Password item name
-    (e.g. 'BofA', 'Wells Fargo') in the Notion Finance Sync vault."""
     return _resolve(
-        f"BANK_USERNAME_{session_display_name.upper().replace(' ', '_')}",
-        f"op://{OP_VAULT}/{session_display_name}/username",
+        "NOTION_API_KEY",
+        f"op://{OP_VAULT}/Notion Finance Sync Notion Internal Integration Secret/credential",
     )
 
 
-def get_bank_password(session_display_name: str) -> str:
-    """Read a per-bank password from the Notion Finance Sync vault."""
+@cache
+def get_gmail_app_password() -> str:
+    """Gmail app password (16-character) for IMAP access.
+
+    Alex's Gmail uses 2FA so plain login won't work; app passwords are issued
+    via Google account security settings and grant IMAP/POP/SMTP access while
+    bypassing 2FA.
+    """
+    return _resolve("GMAIL_APP_PASSWORD", f"op://{OP_VAULT}/Gmail App Password/credential")
+
+
+@cache
+def get_gmail_address() -> str:
+    """Email address (the IMAP username) for the account whose app password we hold."""
+    import os
+
+    val = os.environ.get("GMAIL_ADDRESS")
+    if val:
+        return val
+    # Fallback: hardcoded from CLAUDE.md userEmail context
+    return "[redacted-email]"
+
+
+def _bank_item_name(session_id: str) -> str:
+    """Resolve session_id to the 1Password item title in the project vault."""
+    try:
+        return OP_BANK_ITEM_BY_SESSION[session_id]
+    except KeyError as exc:
+        raise KeyError(
+            f"No 1Password item mapping for session_id {session_id!r}. "
+            f"Add it to settings.OP_BANK_ITEM_BY_SESSION."
+        ) from exc
+
+
+def get_bank_username(session_id: str) -> str:
+    """Read a per-bank username from the Notion Finance Sync vault.
+
+    `session_id` is the internal short identifier (e.g. 'bofa', 'us_bank'). The
+    function maps it to the actual 1Password item title.
+    """
+    item = _bank_item_name(session_id)
     return _resolve(
-        f"BANK_PASSWORD_{session_display_name.upper().replace(' ', '_')}",
-        f"op://{OP_VAULT}/{session_display_name}/password",
+        f"BANK_USERNAME_{session_id.upper()}",
+        f"op://{OP_VAULT}/{item}/username",
+    )
+
+
+def get_bank_password(session_id: str) -> str:
+    """Read a per-bank password from the Notion Finance Sync vault."""
+    item = _bank_item_name(session_id)
+    return _resolve(
+        f"BANK_PASSWORD_{session_id.upper()}",
+        f"op://{OP_VAULT}/{item}/password",
     )
 
 
