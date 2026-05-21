@@ -120,7 +120,9 @@ class NotionClient:
             "page_id": page_id,
             "name": title[0]["plain_text"] if title else "",
             "amount": number("Transaction Amount"),
-            "date": date_start("Transaction Date"),
+            # Key matches TransactionRecord.transaction_date so sync.diffing's
+            # MATERIAL_FIELDS comparison lines up.
+            "transaction_date": date_start("Transaction Date"),
             "transacted_at": date_start("Transacted At"),
             "status": status("Transaction Status"),
             "payee": text("Payee"),
