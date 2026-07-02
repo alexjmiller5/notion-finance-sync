@@ -112,14 +112,19 @@ def get_gmail_app_password() -> str:
 
 @cache
 def get_gmail_address() -> str:
-    """Email address (the IMAP username) for the account whose app password we hold."""
-    import os
+    """Email address (the IMAP username) for the Gmail 2FA reader.
 
+    Read from the ``GMAIL_ADDRESS`` env var (set it in ``.env`` — gitignored — or
+    the deploy environment). Deliberately NOT hardcoded, to keep the personal
+    email out of source control.
+    """
     val = os.environ.get("GMAIL_ADDRESS")
-    if val:
-        return val
-    # Fallback: hardcoded from CLAUDE.md userEmail context
-    return "[redacted-email]"
+    if not val:
+        raise RuntimeError(
+            "GMAIL_ADDRESS is not set. Add it to .env (gitignored) or the deploy "
+            "environment (e.g. the launchd wrapper)."
+        )
+    return val
 
 
 def _bank_item_name(session_id: str) -> str:

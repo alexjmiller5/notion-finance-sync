@@ -5,14 +5,12 @@
     <key>Label</key>
     <string>com.alexmiller.notion-finance-sync</string>
 
+    <!-- Runs the wrapper, which sources the OP service-account token from the
+         macOS Keychain before invoking the sync (see deploy/run_sync.sh). -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/alexmiller/.local/bin/uv</string>
-        <string>run</string>
-        <string>--directory</string>
-        <string>/Users/alexmiller/desktop/coding/active-projects/notion-finance-sync</string>
-        <string>python</string>
-        <string>scripts/sync.py</string>
+        <string>/bin/bash</string>
+        <string>/Users/alexmiller/desktop/coding/active-projects/notion-finance-sync/deploy/run_sync.sh</string>
     </array>
 
     <key>StartCalendarInterval</key>

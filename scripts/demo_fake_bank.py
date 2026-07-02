@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 # Allow running from project root without installing the package
@@ -51,7 +51,7 @@ def make_demo_records() -> list[TransactionRecord]:
             name="DEMO Starbucks",
             amount=-5.75,
             transaction_date=today,
-            transacted_at=datetime.now(tz=timezone.utc),
+            transacted_at=datetime.now(tz=UTC),
             status=TransactionStatus.POSTED,
             payee="Starbucks",
             memo="demo run — should be deleted afterward",
@@ -67,7 +67,7 @@ def make_demo_records() -> list[TransactionRecord]:
             name="DEMO Whole Foods",
             amount=-42.30,
             transaction_date=today,
-            transacted_at=datetime.now(tz=timezone.utc),
+            transacted_at=datetime.now(tz=UTC),
             status=TransactionStatus.POSTED,
             payee="Whole Foods",
             memo="demo run — should be deleted afterward",
@@ -83,7 +83,7 @@ def make_demo_records() -> list[TransactionRecord]:
             name="DEMO Pending Auth",
             amount=-12.00,
             transaction_date=today,
-            transacted_at=datetime.now(tz=timezone.utc),
+            transacted_at=datetime.now(tz=UTC),
             status=TransactionStatus.PENDING,
             payee="Test Merchant",
             memo="demo run — pending status",
@@ -172,9 +172,7 @@ async def main() -> int:
         )
 
     if len(written) != len(fake_records):
-        print(
-            f"\nFAIL: expected {len(fake_records)} rows, found {len(written)}"
-        )
+        print(f"\nFAIL: expected {len(fake_records)} rows, found {len(written)}")
         return 1
 
     print("\nStep 5: Clean up — archive the demo rows")

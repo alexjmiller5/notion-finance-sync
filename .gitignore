@@ -29,3 +29,7 @@ config/cards.yaml
 
 # macOS
 .DS_Store
+
+# Real transaction data used only as local test fixtures (sensitive)
+tests/fixtures/bofa/*.html
+tests/fixtures/bofa/deposit_activity_raw.json

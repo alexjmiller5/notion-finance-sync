@@ -44,19 +44,30 @@ op service-account create "notion-finance-sync-svc" \
   --vault "Notion Finance Sync:read_items,write_items"
 ```
 
-The service-account token is stored in your Personal vault at:
-- `op://Personal/Notion Finance Sync Service Account Token/password`
-
-For unattended runs (the daily launchd job), export the token into
-`OP_SERVICE_ACCOUNT_TOKEN` before invoking sync:
+**How the daemon gets the token (Mac Mini deploy).** The service-account token is
+the bootstrap secret that unlocks every other secret in 1Password, so it can't
+live in 1Password itself and (per project policy) must not sit plaintext on disk.
+On macOS it goes in the **login Keychain** (encrypted at rest):
 
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Personal/Notion Finance Sync Service Account Token/password")
-just sync
+just store-op-token          # prompts for the token (hidden); stores it in Keychain
 ```
 
-For local development, your regular `op signin` session has access to both
-vaults — no env var needed.
+The launchd daily job runs `deploy/run_sync.sh`, which reads the token from the
+Keychain, exports it as `OP_SERVICE_ACCOUNT_TOKEN`, and then runs the sync — so
+the `op` CLI can read bank credentials unattended. Non-secret config
+(`GMAIL_ADDRESS`, the Keychain service name, `APP_*`) lives in a gitignored
+`.env` (`cp .env.example .env`); **never put the token in `.env`.**
+
+Keychain notes: the item is stored with `-A` (any process can read it without a
+GUI prompt) because a headless launchd job can't answer a Keychain access dialog.
+That's an acceptable trade-off on a dedicated single-user Mac Mini; tighten with
+`-T <tool>` if you prefer. Because it's a **LaunchAgent** (runs in your user
+session), the login Keychain must be unlocked — fine on an auto-login Mac Mini.
+
+**Local development / manual runs.** No token needed — either run in `manual`
+auth mode (the scraper prompts for credentials), or use your normal `op signin`
+session and `export OP_SERVICE_ACCOUNT_TOKEN=$(security find-generic-password -a "$USER" -s notion-finance-sync-op-token -w)`.
 
 ### 4. Populate per-bank credentials in the Notion Finance Sync vault
 
@@ -106,7 +117,7 @@ The email 2FA reader uses Gmail's IMAP gateway with an App Password (not OAuth).
 
 Reference path: `op://Notion Finance Sync/Gmail App Password/credential`
 
-The Gmail address itself is read from the `GMAIL_ADDRESS` env var (defaults to `[redacted-email]` if unset).
+The Gmail address itself is **required** via the `GMAIL_ADDRESS` env var (set it in your gitignored `.env`, or the deploy environment). It has no hardcoded default, to keep the personal email out of source control.
 
 ### 7. Full Disk Access for Messages.app SQLite
 

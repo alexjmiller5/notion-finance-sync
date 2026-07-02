@@ -13,7 +13,6 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from notion_finance_sync.banks._base import UnsupportedOperation
 from notion_finance_sync.models import CategoryMap, TransactionRecord
 
 

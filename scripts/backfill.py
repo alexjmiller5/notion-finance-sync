@@ -33,7 +33,9 @@ def parse_args() -> argparse.Namespace:
         help="Earliest date to include. Required for active banks; "
         "ignored for closed PDF-only banks.",
     )
-    p.add_argument("--dry-run", action="store_true", help="Compute changes but don't write to Notion")
+    p.add_argument(
+        "--dry-run", action="store_true", help="Compute changes but don't write to Notion"
+    )
     return p.parse_args()
 
 

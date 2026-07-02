@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import structlog
@@ -27,12 +27,43 @@ logger = structlog.get_logger()
 CHAT_DB = Path.home() / "Library" / "Messages" / "chat.db"
 
 # Apple's timestamp format: nanoseconds since 2001-01-01 UTC
-APPLE_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
+APPLE_EPOCH = datetime(2001, 1, 1, tzinfo=UTC)
 
 
 def _apple_ts(dt: datetime) -> int:
     """Convert a Python datetime to Apple's nanosecond-since-2001 format."""
-    return int((dt.astimezone(timezone.utc) - APPLE_EPOCH).total_seconds() * 1e9)
+    return int((dt.astimezone(UTC) - APPLE_EPOCH).total_seconds() * 1e9)
+
+
+# Modern macOS stores many message bodies in `attributedBody` (a binary
+# streamtyped NSAttributedString) with a NULL `text` column — including BofA's
+# 2FA texts. We only need enough to run the code regex, so pull the printable
+# runs and drop the streamtyped class-name boilerplate.
+_PRINTABLE_RUN = re.compile(rb"[\x20-\x7e]{4,}")
+_STREAM_BOILER = frozenset(
+    {
+        "streamtyped",
+        "NSMutableAttributedString",
+        "NSAttributedString",
+        "NSObject",
+        "NSMutableString",
+        "NSString",
+        "NSDictionary",
+        "NSNumber",
+        "NSValue",
+    }
+)
+
+
+def _decode_attributed_body(blob: bytes | None) -> str:
+    """Best-effort plaintext from a Messages ``attributedBody`` blob."""
+    if not blob:
+        return ""
+    runs = [r.decode("utf-8", "replace") for r in _PRINTABLE_RUN.findall(blob)]
+    kept = [
+        r for r in runs if r not in _STREAM_BOILER and not r.startswith(("__kIM", "NSAttribute"))
+    ]
+    return " ".join(kept).strip()
 
 
 def _query_recent_messages(
@@ -42,14 +73,15 @@ def _query_recent_messages(
 ) -> list[str]:
     """Return message texts received after `after` from senders matching `sender_pattern`.
 
-    `sender_pattern` is a SQL LIKE pattern, e.g. '%bofa%' or '+1800555%'.
+    `sender_pattern` is a SQL LIKE pattern, e.g. '%bofa%', '73981', or '+1800555%'.
+    Reads both the plain `text` column and the binary `attributedBody` fallback.
     """
     cutoff_apple = _apple_ts(after)
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         cur = con.execute(
             """
-            SELECT message.text
+            SELECT message.text, message.attributedBody
             FROM message
             JOIN handle ON message.handle_id = handle.ROWID
             WHERE message.date > ?
@@ -59,7 +91,12 @@ def _query_recent_messages(
             """,
             (cutoff_apple, sender_pattern, sender_pattern),
         )
-        return [row[0] for row in cur.fetchall() if row[0]]
+        out: list[str] = []
+        for text, attributed_body in cur.fetchall():
+            body = text or _decode_attributed_body(attributed_body)
+            if body:
+                out.append(body)
+        return out
     finally:
         con.close()
 
@@ -84,9 +121,9 @@ def get_sms_code(
         The extracted code, or None if timeout reached.
     """
     pattern = re.compile(code_regex)
-    deadline = datetime.now(tz=timezone.utc) + timedelta(seconds=timeout_s)
+    deadline = datetime.now(tz=UTC) + timedelta(seconds=timeout_s)
 
-    while datetime.now(tz=timezone.utc) < deadline:
+    while datetime.now(tz=UTC) < deadline:
         try:
             messages = _query_recent_messages(after, sender_pattern)
         except sqlite3.OperationalError as e:

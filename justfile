@@ -22,6 +22,14 @@ sync-interactive bank:
 backfill bank since:
     uv run python scripts/backfill.py --bank {{bank}} --since {{since}}
 
+# Human-in-the-loop recon: log into BofA by hand, snapshot HTML + HAR for parser design
+recon-bofa:
+    uv run python scripts/recon_bofa.py
+
+# Validate live BofA login + cookie->httpx fetch (opens Chrome, needs phone for 2FA)
+validate-bofa-login:
+    uv run python scripts/validate_bofa_login.py
+
 # One-shot Notion schema migration (rename SimpleFIN fields, add new fields)
 migrate:
     uv run python scripts/migrate_schema.py
@@ -37,6 +45,10 @@ demo:
 # Start the FastAPI HTTP server (foreground)
 serve:
     uv run uvicorn notion_finance_sync.server.app:app --host 127.0.0.1 --port 8765
+
+# Store the 1Password service-account token in the macOS Keychain (Mac Mini deploy)
+store-op-token:
+    ./scripts/store_op_token.sh
 
 # Install the launchd daily-sync job
 install-launchd:

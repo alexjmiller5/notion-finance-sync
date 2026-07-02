@@ -15,9 +15,9 @@ it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
 import structlog
 
@@ -90,8 +90,4 @@ def detect_orphans(
 
 def filter_pending(rows: dict[str, dict]) -> dict[str, dict]:
     """Filter a dict of all Notion rows to just the Pending ones."""
-    return {
-        sid: row
-        for sid, row in rows.items()
-        if row.get("status") == TransactionStatus.PENDING
-    }
+    return {sid: row for sid, row in rows.items() if row.get("status") == TransactionStatus.PENDING}
