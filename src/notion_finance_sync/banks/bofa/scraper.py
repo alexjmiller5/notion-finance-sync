@@ -177,5 +177,14 @@ class BofAScraper:
         for r in recs:
             r.credit_card_account = notion_acct
         recs = [r for r in recs if r.transaction_date and r.transaction_date >= since]
+        # The list JSON truncates long descriptions; fetch each in-window txn's
+        # detail (the UI 'View/Edit' endpoint) for the full untruncated text.
+        for r in recs:
+            token = (r.raw_data or {}).get("transactionToken")
+            if not token:
+                continue
+            full = fetchers.fetch_deposit_detail(client, token, adx)
+            if full:
+                r.name = r.payee = r.memo = full
         logger.info("bofa_deposit_scraped", account=name, count=len(recs))
         return recs

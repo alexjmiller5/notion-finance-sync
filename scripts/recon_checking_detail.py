@@ -92,17 +92,16 @@ def _recon(sb, adx: str) -> None:
     sb.cdp.evaluate(HOOK_JS)
     time.sleep(8)
 
-    # Expand the first few transaction rows to trigger detail XHRs.
+    # Click the "View/Edit" links — THIS fires the per-txn detail AJAX.
     clicked = sb.cdp.evaluate("""
         (() => {
-            const rows = document.querySelectorAll(
-                '[data-testid*="transaction"], [class*="transaction"] button, table tbody tr');
+            const links = document.querySelectorAll('a.view-transaction-details');
             let n = 0;
-            for (const r of rows) {
-                if (n >= 4) break;
-                try { r.click(); n++; } catch (e) {}
+            for (const a of links) {
+                if (n >= 3) break;
+                try { a.click(); n++; } catch (e) {}
             }
-            return n + ' clicked of ' + rows.length + ' rows';
+            return n + ' View/Edit clicked of ' + links.length + ' links';
         })()
     """)
     print("[..] row clicks:", clicked)

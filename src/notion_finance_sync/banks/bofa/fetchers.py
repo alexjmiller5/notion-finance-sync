@@ -23,7 +23,30 @@ ORIGIN = "https://secure.bankofamerica.com"
 _CARD_BASE = ORIGIN + "/myaccounts/details/card/account-details.go"
 _CARD_DETAIL = ORIGIN + "/myaccounts/details/card/transaction-details.go"
 _DEPOSIT_ACTIVITY = ORIGIN + "/ogateway/addapi/v1/activity"
+_DEPOSIT_DETAIL = ORIGIN + "/ogateway/addapi/v1/transaction/detail/content"
 _REWARDS_LANDING = ORIGIN + "/customer/myrewards/points/landing.go"
+
+
+def fetch_deposit_detail(client: httpx.Client, transaction_token: str, account_token: str) -> str:
+    """Full untruncated description for one deposit txn (the UI 'View/Edit' call).
+
+    The activity list truncates ``preferredDescription`` to ~64 chars; this
+    per-txn endpoint returns ``payload.transaction.longDescription`` in full.
+    Returns "" on any failure so a bad detail never breaks the whole scrape.
+    """
+    try:
+        resp = client.post(
+            _DEPOSIT_DETAIL,
+            json={
+                "payload": {"transactionToken": transaction_token, "accountToken": account_token}
+            },
+            headers={"request-locale": "en-us"},
+        )
+        resp.raise_for_status()
+        txn = resp.json().get("payload", {}).get("transaction", {})
+        return (txn.get("longDescription") or txn.get("shortDescription") or "").strip()
+    except Exception:  # noqa: BLE001 — enrichment is best-effort
+        return ""
 _STMT_STX_RE = re.compile(r"stx=([0-9a-f]+)&(?:amp;)?target=stmtFromDateList")
 
 
