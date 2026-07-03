@@ -53,6 +53,7 @@ from notion_finance_sync.models import compute_review_status
 from notion_finance_sync.notion.client import NotionClient
 from notion_finance_sync.sync.diffing import build_transaction_changes
 from notion_finance_sync.sync.orphan import detect_orphans, filter_pending
+from notion_finance_sync.sync.reconcile import reconcile_pending_to_posted
 
 logger = structlog.get_logger()
 
@@ -285,23 +286,10 @@ async def _run_one_attempt(
     # 3. Diff
     changes = build_transaction_changes(scraped=scraped, existing=existing)
 
-    # 4. Apply creates + updates. Default Review Status per the heuristic
-    #    (Venmo / PDF / refund-shaped txns -> Needs Review; rest -> Reviewed).
-    #    The scraper may set review_status explicitly for special cases; only
-    #    fill in when None.
-    for record in changes.to_create:
-        if record.review_status is None:
-            record.review_status = compute_review_status(record)
-        await client.create_from_record(record)
-    for page_id, record in changes.to_update:
-        if record.review_status is None:
-            record.review_status = compute_review_status(record)
-        await client.update_from_record(page_id, record)
-
-    # 5. Orphan release (only after a clean scrape — see SPEC §9). The Notion DB
-    #    holds EVERY bank's rows, so scope to accounts seen in THIS scrape — one
-    #    bank's sync must never release another bank's pending rows (bit us live
-    #    2026-07-03 when parallel per-bank syncs released each other's rows).
+    # 3b. Identify pending rows that would be released (only after a clean scrape —
+    #     SPEC §9). Scope to accounts seen in THIS scrape — one bank's sync must never
+    #     touch another bank's pending rows (bit us live 2026-07-03 when parallel
+    #     per-bank syncs released each other's rows).
     scraped_accounts = {r.source_account_id for r in scraped}
     pending = {
         sid: row
@@ -313,17 +301,46 @@ async def _run_one_attempt(
         fresh_scrape_records=scraped,
         scrape_was_successful=True,
     )
+
+    # 3c. Reconcile pending -> posted. A card txn gets a NEW bank id when it posts, so
+    #     its posted form lands in `to_create` while the pending row becomes an orphan.
+    #     Match them so the pending row is updated in place (no duplicate, and no wrong
+    #     "Released" — that status is reserved for genuine auth reversals).
+    orphan_rows = {o.source_id: pending[o.source_id] for o in orphans}
+    reconciliation = reconcile_pending_to_posted(
+        to_create=changes.to_create, orphan_pending_rows=orphan_rows
+    )
+    creates = reconciliation.remaining_creates
+    updates = changes.to_update + reconciliation.matched
+
+    # 4. Apply creates + updates. Default Review Status per the heuristic
+    #    (Venmo / PDF / refund-shaped txns -> Needs Review; rest -> Reviewed).
+    #    The scraper may set review_status explicitly for special cases; only
+    #    fill in when None.
+    for record in creates:
+        if record.review_status is None:
+            record.review_status = compute_review_status(record)
+        await client.create_from_record(record)
+    for page_id, record in updates:
+        if record.review_status is None:
+            record.review_status = compute_review_status(record)
+        await client.update_from_record(page_id, record)
+
+    # 5. Release the orphans that were NOT reconciled to a posted txn — these are the
+    #    genuinely-vanished pending rows (real authorization reversals).
     for orphan in orphans:
+        if orphan.source_id in reconciliation.reconciled_source_ids:
+            continue
         await client.release_transaction(
             page_id=orphan.page_id,
             release_date=orphan.release_date.isoformat(),
         )
 
     return _AttemptOutcome(
-        created=len(changes.to_create),
-        updated=len(changes.to_update),
+        created=len(creates),
+        updated=len(updates),
         unchanged=len(changes.unchanged),
-        released=len(orphans),
+        released=len(orphans) - len(reconciliation.reconciled_source_ids),
     )
 
 
