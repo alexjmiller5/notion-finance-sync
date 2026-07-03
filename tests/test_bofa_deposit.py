@@ -89,9 +89,9 @@ def test_account_name_override(raw):
 def test_clean_description_trims_truncation_tail():
     from notion_finance_sync.banks.bofa.deposit import _clean_description
 
+    truncated = ' Zelle Recurring payment to Alexander Miller - EverBank for "regularly...'
     assert (
-        _clean_description(' Zelle Recurring payment to Alexander Miller - EverBank for "regularly...')
-        == "Zelle Recurring payment to Alexander Miller - EverBank"
+        _clean_description(truncated) == "Zelle Recurring payment to Alexander Miller - EverBank"
     )
     # non-truncated descriptions are untouched (aside from strip)
     assert _clean_description(" Zelle payment to Trevor Conf# tw0n5t2yn ") == (

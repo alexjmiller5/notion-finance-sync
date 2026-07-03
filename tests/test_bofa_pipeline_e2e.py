@@ -44,10 +44,8 @@ def test_card_record_encodes_to_expected_notion_properties(card_first_record):
     assert props["Bank Category"]["rich_text"][0]["text"]["content"] == "Groceries: Groceries"
     assert props["Card Network"]["select"]["name"] == "Visa"
     assert props["True Rewards"]["number"] == 12.55  # points (7.17 base + 5.38 bonus)
-    assert (
-        props["Transaction Source ID"]["rich_text"][0]["text"]["content"]
-        == "74199476176000196128793"
-    )
+    # source_id is a stable content hash now (BofA's per-row ref is unstable across views)
+    assert len(props["Transaction Source ID"]["rich_text"][0]["text"]["content"]) == 64
     # two description fields: Payee = cleaned merchant, Memo = raw statement line
     assert props["Payee"]["rich_text"][0]["text"]["content"] == "PARADISE MARKET"
     assert props["Memo"]["rich_text"][0]["text"]["content"] == "PARADISE MARKET MIKONOS"

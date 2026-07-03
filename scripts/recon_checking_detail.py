@@ -39,7 +39,10 @@ window.fetch = async function(input, init) {
 };
 const origOpen = XMLHttpRequest.prototype.open;
 const origSend = XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.open = function(m, u) { this.__m = m; this.__u = u; return origOpen.apply(this, arguments); };
+XMLHttpRequest.prototype.open = function(m, u) {
+    this.__m = m; this.__u = u;
+    return origOpen.apply(this, arguments);
+};
 XMLHttpRequest.prototype.send = function(b) {
     this.addEventListener('load', () => {
         window.__recon.push({url: this.__u, method: this.__m, body: b ? String(b) : null,
@@ -76,7 +79,10 @@ def main() -> None:
             sb.cdp.click("#ah-authcode-select-continue-btn")
             sb.cdp.wait_for_element_visible("#ahAuthcodeValidateOTP", timeout=45)
         code = get_sms_code(
-            after=requested, sender_pattern=BOFA_SMS_SENDER, code_regex=BOFA_SMS_REGEX, timeout_s=150
+            after=requested,
+            sender_pattern=BOFA_SMS_SENDER,
+            code_regex=BOFA_SMS_REGEX,
+            timeout_s=150,
         )
         assert code, "no 2FA code"
         sb.cdp.type("#ahAuthcodeValidateOTP", code)

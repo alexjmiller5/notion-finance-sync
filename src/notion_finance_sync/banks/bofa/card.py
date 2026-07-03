@@ -18,8 +18,9 @@ list (id, date, payee, signed amount, running balance) and stashes the detail
 
 from __future__ import annotations
 
+import hashlib
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from bs4 import BeautifulSoup, Comment
 
@@ -71,7 +72,33 @@ def _parse_date(text: str):
     return datetime.strptime(m.group(1), "%m/%d/%Y").date() if m else None
 
 
-def parse_statement(html: str) -> list[TransactionRecord]:
+def _stable_source_id(
+    account_key: str,
+    txn_date: date | None,
+    amount: float,
+    payee: str,
+    running_balance: float | None,
+) -> str:
+    """Content-derived, session-stable id for a card txn.
+
+    BofA's per-row reference is often absent (→ an unstable per-view txn hash),
+    which duplicated rows across statement views. Hash stable content instead;
+    ``running_balance`` keeps repeated same-day/same-amount txns distinct, and
+    ``account_key`` separates the same purchase appearing on different cards.
+    """
+    key = "|".join(
+        (
+            account_key,
+            str(txn_date or ""),
+            f"{amount:.2f}",
+            payee.strip(),
+            "" if running_balance is None else f"{running_balance:.2f}",
+        )
+    )
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def parse_statement(html: str, *, account_key: str = "") -> list[TransactionRecord]:
     """Parse a card statement/activity page into ``TransactionRecord``s.
 
     Category and rewards are NOT set here (enriched later from the per-txn detail
@@ -139,7 +166,7 @@ def parse_statement(html: str) -> list[TransactionRecord]:
 
         records.append(
             TransactionRecord(
-                source_id=source_id,
+                source_id=_stable_source_id(account_key, txn_date, amount, payee, running_balance),
                 source_account_id="",
                 name=payee,
                 amount=amount,
@@ -151,6 +178,7 @@ def parse_statement(html: str) -> list[TransactionRecord]:
                 bank=BankName.BANK_OF_AMERICA,
                 account_type=AccountType.CREDIT_CARD,
                 raw_data={
+                    "bank_ref": source_id,
                     "detail_txn_hash": detail_hash,
                     "detail_url": detail_url,
                     "txn_type": icon_type,

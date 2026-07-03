@@ -123,7 +123,7 @@ class BofAScraper:
         self, client, name: str, adx: str, html: str, reward_entries: list[dict]
     ) -> list[TransactionRecord]:
         """Parse one card statement HTML, enrich each row with detail + rewards."""
-        rows = card.parse_statement(html)
+        rows = card.parse_statement(html, account_key=name)
         detail_map: dict[str, str] = {}
         for r in rows:
             url = r.raw_data.get("detail_url")

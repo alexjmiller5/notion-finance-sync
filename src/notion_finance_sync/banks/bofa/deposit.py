@@ -62,10 +62,11 @@ def _stable_source_id(t: dict, account_id: str) -> str:
 def _clean_description(desc: str) -> str:
     """Trim BofA's server-side truncation tail.
 
-    The checking activity API truncates long descriptions to ~64 chars ending in
-    ``...`` (the full text isn't exposed anywhere — no per-txn detail endpoint,
-    verified 2026-07-03). When truncated, drop the dangling cut-off fragment so
-    the name reads cleanly instead of ``... - EverBank for "regularly...``.
+    The activity list truncates long descriptions to ~64 chars ending in ``...``.
+    The scraper normally replaces these with the full ``longDescription`` from the
+    per-txn detail endpoint (see ``fetchers.fetch_deposit_detail``); this stays as
+    a fallback for when that detail fetch fails, dropping the dangling cut-off
+    fragment so the name reads cleanly instead of ``... - EverBank for "regularly...``.
     """
     desc = desc.strip()
     if not desc.endswith("..."):

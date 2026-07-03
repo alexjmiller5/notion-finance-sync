@@ -34,7 +34,9 @@ def test_statement_parses_transaction_rows(statement_html):
 def test_first_row_fields(statement_html):
     rec = card.parse_statement(statement_html)[0]
     # First row (recon): PARADISE MARKET MIKONOS, 06/26/2026, $4.78, balance $884.34
-    assert rec.source_id == "74199476176000196128793"
+    # source_id is now a content hash (BofA's per-row ref is unstable across views)
+    assert len(rec.source_id) == 64  # sha256 hex
+    assert rec.raw_data.get("bank_ref") == "74199476176000196128793"  # old ref kept for audit
     assert "PARADISE MARKET MIKONOS" in rec.name
     assert rec.transaction_date == date(2026, 6, 26)
     assert rec.amount == -4.78  # purchase -> debit (sign derived from type icon)
