@@ -298,8 +298,16 @@ async def _run_one_attempt(
             record.review_status = compute_review_status(record)
         await client.update_from_record(page_id, record)
 
-    # 5. Orphan release (only after a clean scrape — see SPEC §9)
-    pending = filter_pending(existing)
+    # 5. Orphan release (only after a clean scrape — see SPEC §9). The Notion DB
+    #    holds EVERY bank's rows, so scope to accounts seen in THIS scrape — one
+    #    bank's sync must never release another bank's pending rows (bit us live
+    #    2026-07-03 when parallel per-bank syncs released each other's rows).
+    scraped_accounts = {r.source_account_id for r in scraped}
+    pending = {
+        sid: row
+        for sid, row in filter_pending(existing).items()
+        if row.get("source_account_id") in scraped_accounts
+    }
     orphans = detect_orphans(
         pending_notion_rows=pending,
         fresh_scrape_records=scraped,
