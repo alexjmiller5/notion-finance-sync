@@ -1,0 +1,85 @@
+{
+  "data": [
+    {
+      "id": "3800000000000000001",
+      "type": "payment",
+      "date_created": "2026-07-02T15:04:18",
+      "date_updated": "2026-07-02T15:04:20",
+      "note": "Dinner 🍜",
+      "audience": "private",
+      "payment": {
+        "id": "3900000000000000001",
+        "action": "pay",
+        "amount": 30.0,
+        "status": "settled",
+        "date_completed": "2026-07-02T15:04:19",
+        "note": "Dinner 🍜",
+        "actor": {"id": "1111111111111111111", "username": "alexm521", "display_name": "Alex Miller", "first_name": "Alex", "last_name": "Miller"},
+        "target": {"user": {"id": "2222222222222222222", "username": "jordanr", "display_name": "Jordan Rivera", "first_name": "Jordan", "last_name": "Rivera"}}
+      }
+    },
+    {
+      "id": "3800000000000000002",
+      "type": "payment",
+      "date_created": "2026-07-01T02:30:00",
+      "date_updated": "2026-07-01T02:30:05",
+      "note": "concert tix",
+      "audience": "friends",
+      "payment": {
+        "id": "3900000000000000002",
+        "action": "pay",
+        "amount": 85.5,
+        "status": "settled",
+        "date_completed": "2026-07-01T02:30:02",
+        "note": "concert tix",
+        "actor": {"id": "3333333333333333333", "username": "samk", "display_name": "Sam Kelly", "first_name": "Sam", "last_name": "Kelly"},
+        "target": {"user": {"id": "1111111111111111111", "username": "alexm521", "display_name": "Alex Miller", "first_name": "Alex", "last_name": "Miller"}}
+      }
+    },
+    {
+      "id": "3800000000000000003",
+      "type": "payment",
+      "date_created": "2026-06-30T20:00:00",
+      "date_updated": "2026-06-30T20:05:00",
+      "note": "you owe me for gas",
+      "audience": "private",
+      "payment": {
+        "id": "3900000000000000003",
+        "action": "charge",
+        "amount": 12.0,
+        "status": "settled",
+        "date_completed": "2026-06-30T21:00:00",
+        "note": "you owe me for gas",
+        "actor": {"id": "1111111111111111111", "username": "alexm521", "display_name": "Alex Miller", "first_name": "Alex", "last_name": "Miller"},
+        "target": {"user": {"id": "2222222222222222222", "username": "jordanr", "display_name": "Jordan Rivera", "first_name": "Jordan", "last_name": "Rivera"}}
+      }
+    },
+    {
+      "id": "3800000000000000004",
+      "type": "payment",
+      "date_created": "2026-06-29T12:00:00",
+      "date_updated": "2026-06-29T12:00:00",
+      "note": "splitwise settle",
+      "audience": "private",
+      "payment": {
+        "id": "3900000000000000004",
+        "action": "charge",
+        "amount": 40.0,
+        "status": "pending",
+        "date_completed": null,
+        "note": "splitwise settle",
+        "actor": {"id": "3333333333333333333", "username": "samk", "display_name": "Sam Kelly", "first_name": "Sam", "last_name": "Kelly"},
+        "target": {"user": {"id": "1111111111111111111", "username": "alexm521", "display_name": "Alex Miller", "first_name": "Alex", "last_name": "Miller"}}
+      }
+    },
+    {
+      "id": "3800000000000000005",
+      "type": "transfer",
+      "date_created": "2026-06-28T09:00:00",
+      "date_updated": "2026-06-28T09:00:00",
+      "note": null,
+      "audience": "private",
+      "transfer": {"amount": 100.0, "status": "settled"}
+    }
+  ]
+}
