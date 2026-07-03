@@ -61,7 +61,6 @@ def _row(
         "name": name,
         "amount": amount,
         "transaction_date": transaction_date,
-        "transacted_at": None,
         "status": status,
         "payee": name,
         "memo": "",

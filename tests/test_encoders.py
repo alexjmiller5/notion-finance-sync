@@ -114,9 +114,10 @@ class TestEncodeTransactionFullRecord:
     def test_transaction_date_encoded(self):
         assert self.props["Transaction Date"] == {"date": {"start": "2025-03-15"}}
 
-    def test_transacted_at_encoded(self):
-        val = self.props["Transacted At"]["date"]["start"]
-        assert val.startswith("2025-03-15T14:30:00")
+    def test_transacted_at_never_written(self):
+        # Schema migrated away from `Transacted At` (2026-07-03): the record
+        # field is model-only and must not reach Notion even when set.
+        assert "Transacted At" not in self.props
 
     def test_status_encoded(self):
         assert self.props["Transaction Status"] == {"status": {"name": "Posted"}}

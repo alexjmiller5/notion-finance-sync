@@ -32,7 +32,6 @@ MATERIAL_FIELDS = (
     "name",
     "amount",
     "transaction_date",
-    "transacted_at",
     "status",
     "payee",
     "memo",
