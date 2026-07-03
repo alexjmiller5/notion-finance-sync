@@ -46,7 +46,6 @@ def _rec(amount, payee, txn_date):
         name=payee,
         amount=amount,
         transaction_date=txn_date,
-        transacted_at=None,
         status=TransactionStatus.POSTED,
         payee=payee,
         bank=BankName.BANK_OF_AMERICA,

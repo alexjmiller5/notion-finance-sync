@@ -63,9 +63,6 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
     props["Bilt Partner"] = _checkbox(record.bilt_partner)
     props["Excluded from Spending"] = _checkbox(record.excluded_from_spending)
 
-    if record.transacted_at is not None:
-        props["Transacted At"] = _date(record.transacted_at.isoformat())
-
     if record.payee:
         props["Payee"] = _rich_text(record.payee)
 
@@ -98,6 +95,9 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
 
     if record.true_rewards is not None:
         props["True Rewards"] = _number(record.true_rewards)
+
+    if record.rewards_type is not None:
+        props["Rewards Type"] = _select(record.rewards_type.value)
 
     if record.bilt_points is not None:
         props["Bilt Points"] = _number(record.bilt_points)

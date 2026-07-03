@@ -93,7 +93,6 @@ def _make_record(
         name=name,
         amount=amount,
         transaction_date=transaction_date or date(2026, 5, 1),
-        transacted_at=None,  # _existing_row omits "Transacted At" too
         status=status,
         payee=name,
         memo="",

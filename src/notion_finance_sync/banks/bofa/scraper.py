@@ -24,7 +24,7 @@ import structlog
 from notion_finance_sync.banks._base import UnsupportedOperation  # noqa: F401  (protocol docs)
 from notion_finance_sync.banks.bofa import assemble, card, deposit, fetchers, rewards, session
 from notion_finance_sync.banks.bofa.categories import BOFA_LABEL_TO_CANONICAL
-from notion_finance_sync.models import AccountType, TransactionRecord
+from notion_finance_sync.models import AccountType, RewardsType, TransactionRecord
 
 logger = structlog.get_logger()
 
@@ -58,6 +58,16 @@ NOTION_ACCOUNT: dict[str, str] = {
     "American Quarter Horse Association Visa Signature - 1656": "AQHA Customized Cash Rewards",
     "National Education Association Visa Signature - 8202": "NEA Customized Cash Rewards",
     "Adv Plus Banking - 2093": "Advantage Plus",
+}
+
+# Each card's rewards currency. Travel Rewards earns points; the Cash Rewards
+# cards earn cashback. Tells Notion whether True/Calculated Rewards are $ or pts.
+CARD_REWARD_TYPE: dict[str, RewardsType] = {
+    "Travel Rewards Visa Signature - 9766": RewardsType.POINTS,
+    "Unlimited Cash Rewards Visa Signature - 3510": RewardsType.CASHBACK,
+    "Susan G. Komen For the Cure Visa Signature - 1762": RewardsType.CASHBACK,
+    "American Quarter Horse Association Visa Signature - 1656": RewardsType.CASHBACK,
+    "National Education Association Visa Signature - 8202": RewardsType.CASHBACK,
 }
 
 
@@ -134,9 +144,11 @@ class BofAScraper:
                 except Exception as exc:  # noqa: BLE001 — one bad detail shouldn't sink the run
                     logger.warning("bofa_card_detail_failed", card=name, error=str(exc))
         assemble.enrich_card_records(rows, detail_map, reward_entries)
+        reward_type = CARD_REWARD_TYPE.get(name)
         for r in rows:
             r.account_name = name  # full descriptive name (free-text field)
             r.credit_card_account = NOTION_ACCOUNT.get(name)  # curated Notion select value
+            r.rewards_type = reward_type
         return rows
 
     def _fetch_card(self, client, name: str, adx: str, since: date) -> list[TransactionRecord]:

@@ -125,7 +125,6 @@ def parse_activity(
                 name=desc,
                 amount=float(t["amount"]["amount"]),
                 transaction_date=_parse_date(t["formattedPostedDate"]),
-                transacted_at=None,
                 status=_status(t.get("status", {}).get("value")),
                 payee=desc,
                 memo=desc,

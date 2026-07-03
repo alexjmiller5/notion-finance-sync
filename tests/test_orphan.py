@@ -25,7 +25,6 @@ def _record(
         name="Test",
         amount=-1.0,
         transaction_date=date(2026, 5, 1),
-        transacted_at=None,
         status=status,
         bank=BankName.BANK_OF_AMERICA,
         account_type=AccountType.CREDIT_CARD,

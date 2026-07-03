@@ -171,7 +171,6 @@ def parse_statement(html: str, *, account_key: str = "") -> list[TransactionReco
                 name=payee,
                 amount=amount,
                 transaction_date=txn_date,
-                transacted_at=None,
                 status=TransactionStatus.PENDING if is_pending else TransactionStatus.POSTED,
                 payee=payee,
                 memo=payee,

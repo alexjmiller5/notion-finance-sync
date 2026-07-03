@@ -27,7 +27,6 @@ def _record(
         name="x",
         amount=amount,
         transaction_date=date(2026, 5, 1),
-        transacted_at=None,
         status=TransactionStatus.POSTED,
         account_type=account_type,
         category=category,

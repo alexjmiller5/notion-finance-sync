@@ -51,34 +51,21 @@ DESCRIPTIONS: dict[str, str] = {
     "Price Per Share": "Execution price per share/unit — investment transactions only.",
     # --- manual / computed ---
     "Excluded from Spending": "Check to keep this row out of spending totals (transfers, card payments, reimbursements).",
+    "Rewards Type": "Whether the card earns Cashback or Points — set by the scraper per card (the unit of the rewards fields).",
+    "Cashback Percentage": "Card's cashback/earn rate (manual reference; not set by the scraper).",
     "Tags": "Freeform manual tags for ad-hoc grouping/filtering.",
     "Net Amount": "Formula: Transaction Amount net of linked Related Transactions (e.g. after a reimbursement/settlement).",
     "Rewards (if any)": "Formula: shows earned rewards (cashback or points) for quick scanning.",
     "Related Transactions": "Manual links to related rows — e.g. the two legs of a transfer or a trip settlement.",
     "Related to Transactions (Related Transactions)": "Auto back-reference: rows that link to this one via Related Transactions.",
     "Related Transactions Amount": "Rollup: sum of the amounts of the linked Related Transactions.",
-    # --- delete candidates (flagged in the description) ---
-    "Transacted At": "(Unused — always empty; DELETE CANDIDATE, superseded by Transaction Date.)",
-    "Cashback Percentage": "(Not written by the scraper — DELETE CANDIDATE.)",
-    "Rewards Type": "(Not written by the scraper — DELETE CANDIDATE.)",
-    "Data Source Leader": "(Legacy SimpleFIN/LunchFlow merge field — unused by current scraper; DELETE CANDIDATE.)",
-    "Data Source Log": "(Legacy dual-provider merge log — unused; DELETE CANDIDATE.)",
-    "Descriptions Match": "(Legacy: whether SimpleFIN & LunchFlow descriptions agreed — unused; DELETE CANDIDATE.)",
-    "Description Diff": "(Legacy: diff between provider descriptions — unused; DELETE CANDIDATE.)",
 }
-
-# Restore options we wiped while probing the API (this field is a delete candidate).
-_RESTORE_OPTIONS = {"Data Source Leader": ["SimpleFIN", "LunchFlow", "Equal"]}
-
 
 def _type_config(name: str, prop: dict) -> dict:
     """Existing type config to round-trip so a description update preserves it."""
     t = prop["type"]
     if t in ("select", "multi_select"):
-        opts = prop[t].get("options", [])
-        if name in _RESTORE_OPTIONS and not opts:
-            opts = [{"name": o} for o in _RESTORE_OPTIONS[name]]
-        return {t: {"options": opts}}
+        return {t: {"options": prop[t].get("options", [])}}
     if t == "status":
         return {"status": {}}  # status options are managed by Notion; {} is a no-op here
     if t == "number":

@@ -23,7 +23,6 @@ def _rec(source_id: str, amount: float):
         name="x",
         amount=amount,
         transaction_date=date(2025, 8, 1),
-        transacted_at=None,
         status=TransactionStatus.POSTED,
         bank=BankName.BANK_OF_AMERICA,
         account_type=AccountType.CREDIT_CARD,

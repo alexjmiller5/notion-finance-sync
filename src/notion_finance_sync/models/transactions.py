@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
 
 
@@ -46,6 +46,14 @@ class AccountType(StrEnum):
 class CardNetwork(StrEnum):
     VISA = "Visa"
     MASTERCARD = "Mastercard"
+
+
+class RewardsType(StrEnum):
+    """Currency of a card's rewards — tells you whether True/Calculated Rewards
+    are dollars (Cashback) or Points."""
+
+    CASHBACK = "Cashback"
+    POINTS = "Points"
 
 
 class CanonicalCategory(StrEnum):
@@ -99,9 +107,6 @@ class TransactionRecord:
     transaction_date: date
     """The logical date the bank associates with the transaction."""
 
-    transacted_at: datetime | None
-    """Actual timestamp if the bank exposes it (some do, some don't)."""
-
     status: TransactionStatus
 
     # ------------------------------------------------------------------
@@ -138,6 +143,9 @@ class TransactionRecord:
 
     true_rewards: float | None = None
     """Scraped from bank/portal. Null for US Bank by design."""
+
+    rewards_type: RewardsType | None = None
+    """Whether this card earns Cashback or Points (the unit of the rewards fields)."""
 
     bilt_points: float | None = None
     """Cross-card Bilt rewards. Populated by `bilt_portal` enricher."""

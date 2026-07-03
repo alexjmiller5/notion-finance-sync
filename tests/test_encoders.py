@@ -13,7 +13,7 @@ Coverage:
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date
 
 import httpx
 import pytest
@@ -23,6 +23,7 @@ from notion_finance_sync.models.transactions import (
     BankName,
     CanonicalCategory,
     CardNetwork,
+    RewardsType,
     TransactionRecord,
     TransactionStatus,
 )
@@ -45,7 +46,6 @@ def make_full_record() -> TransactionRecord:
         name="Starbucks",
         amount=-5.75,
         transaction_date=date(2025, 3, 15),
-        transacted_at=datetime(2025, 3, 15, 14, 30, 0, tzinfo=UTC),
         status=TransactionStatus.POSTED,
         payee="Starbucks Coffee",
         memo="Morning coffee",
@@ -58,6 +58,7 @@ def make_full_record() -> TransactionRecord:
         account_name="Bilt World Elite",
         calculated_rewards=0.1725,
         true_rewards=0.115,
+        rewards_type=RewardsType.CASHBACK,
         bilt_points=5.75,
         bilt_partner=True,
         quantity=None,
@@ -73,7 +74,6 @@ def make_sparse_record() -> TransactionRecord:
         name="Amazon",
         amount=-99.99,
         transaction_date=date(2025, 4, 1),
-        transacted_at=None,
         status=TransactionStatus.PENDING,
     )
 
@@ -85,7 +85,6 @@ def make_investment_record() -> TransactionRecord:
         name="TSLA Buy",
         amount=-500.00,
         transaction_date=date(2025, 4, 5),
-        transacted_at=None,
         status=TransactionStatus.POSTED,
         bank=BankName.ETRADE,
         account_type=AccountType.BROKERAGE,
@@ -113,10 +112,6 @@ class TestEncodeTransactionFullRecord:
 
     def test_transaction_date_encoded(self):
         assert self.props["Transaction Date"] == {"date": {"start": "2025-03-15"}}
-
-    def test_transacted_at_encoded(self):
-        val = self.props["Transacted At"]["date"]["start"]
-        assert val.startswith("2025-03-15T14:30:00")
 
     def test_status_encoded(self):
         assert self.props["Transaction Status"] == {"status": {"name": "Posted"}}
@@ -164,6 +159,9 @@ class TestEncodeTransactionFullRecord:
     def test_true_rewards_encoded(self):
         assert self.props["True Rewards"] == {"number": 0.115}
 
+    def test_rewards_type_encoded(self):
+        assert self.props["Rewards Type"] == {"select": {"name": "Cashback"}}
+
     def test_bilt_points_encoded(self):
         assert self.props["Bilt Points"] == {"number": 5.75}
 
@@ -199,9 +197,6 @@ class TestEncodeTransactionSparseRecord:
         assert "Transaction Status" in self.props
         assert "Transaction Source ID" in self.props
         assert "Source Account ID" in self.props
-
-    def test_transacted_at_absent_when_none(self):
-        assert "Transacted At" not in self.props
 
     def test_payee_absent_when_empty_string(self):
         assert "Payee" not in self.props
