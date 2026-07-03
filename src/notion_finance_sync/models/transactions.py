@@ -100,7 +100,11 @@ class TransactionRecord:
     """The logical date the bank associates with the transaction."""
 
     transacted_at: datetime | None
-    """Actual timestamp if the bank exposes it (some do, some don't)."""
+    """Actual timestamp if the bank exposes it (some do, some don't).
+
+    Model-only: feeds ``transaction_date`` derivation (e.g. Bilt converts the
+    UTC timestamp to an Eastern date). NOT persisted to Notion — the schema
+    migrated away from a separate `Transacted At` property (2026-07-03)."""
 
     status: TransactionStatus
 

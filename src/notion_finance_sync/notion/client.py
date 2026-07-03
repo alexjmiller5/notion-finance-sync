@@ -123,7 +123,6 @@ class NotionClient:
             # Key matches TransactionRecord.transaction_date so sync.diffing's
             # MATERIAL_FIELDS comparison lines up.
             "transaction_date": date_start("Transaction Date"),
-            "transacted_at": date_start("Transacted At"),
             "status": status("Transaction Status"),
             "payee": text("Payee"),
             "memo": text("Memo"),
