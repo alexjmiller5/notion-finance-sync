@@ -275,8 +275,9 @@ async def _run_one_attempt(
 
     Any exception propagates to the retry loop in ``_sync_one``.
     """
-    # 1. Scrape
-    scraped = scraper.fetch_recent(since)
+    # 1. Scrape (in a worker thread — the browser login drives SeleniumBase's own
+    #    asyncio loop, which can't start inside our running event loop)
+    scraped = await asyncio.to_thread(scraper.fetch_recent, since)
 
     # 2. Read existing Notion rows
     existing = await client.get_existing_transactions(since_date=since.isoformat())

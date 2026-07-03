@@ -40,12 +40,24 @@ def parse_args() -> argparse.Namespace:
 
 
 async def main() -> int:
+    from notion_finance_sync.backfill.runner import run_backfill
+
     args = parse_args()
+    if args.since is None:
+        print("--since is required for live backfill (e.g. --since 2025-06-01)")
+        return 2
+
     logger.info(
-        "backfill_start", bank=args.bank, since=args.since.isoformat() if args.since else None
+        "backfill_start", bank=args.bank, since=args.since.isoformat(), dry_run=args.dry_run
     )
-    # TODO: wire up to notion_finance_sync.backfill.runner
-    logger.warning("backfill_not_yet_wired", message="backfill runner not implemented")
+    result = await run_backfill(args.bank, since=args.since, dry_run=args.dry_run)
+
+    mode = "DRY RUN" if result.dry_run else "WRITTEN"
+    extra = "" if result.dry_run else f" | created {result.created}, updated {result.updated}"
+    print(
+        f"[{mode}] {result.session_id}: scraped {result.scraped} | "
+        f"create {result.to_create}, update {result.to_update}, unchanged {result.unchanged}{extra}"
+    )
     return 0
 
 
