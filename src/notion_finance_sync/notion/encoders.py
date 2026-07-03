@@ -61,7 +61,7 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
     props["Source Account ID"] = _rich_text(record.source_account_id)
 
     props["Bilt Partner"] = _checkbox(record.bilt_partner)
-    props["Excluded from Spending"] = _checkbox(record.excluded_from_spending)
+    props["Excluded"] = _checkbox(record.excluded_from_spending)
 
     if record.transacted_at is not None:
         props["Transacted At"] = _date(record.transacted_at.isoformat())
