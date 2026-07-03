@@ -57,7 +57,9 @@ OP_BANK_ITEM_BY_SESSION: dict[str, str] = {
     "us_bank": "U.S. Bank",
     "everbank": "Everbank",
     "venmo": "Venmo",
-    "etrade": "E*Trade",
+    # The item is titled "E*Trade" but `*` is illegal in op:// secret references,
+    # so we reference it by item ID instead.
+    "etrade": "REDACTED_OP_ITEM_ID",
     "fidelity": "Fidelity",
     # NB: Bilt is NOT in the vault. Bilt sessions are long-lived (auth by SMS to
     # Alex's phone, persistent device-trust on personal devices). When/if a fresh
