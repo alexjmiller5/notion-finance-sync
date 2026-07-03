@@ -121,28 +121,30 @@ def main() -> None:
         # SSO into the first (IRA is typically first; capture content tells us which).
         target = "https://secure.bankofamerica.com" + hrefs[0]
         sb.cdp.open(target)
-        time.sleep(10)  # gcslsso -> Merrill redirect chain
+        time.sleep(10)  # gcslsso -> private-bank redirect chain
         sb.cdp.evaluate(HOOK_JS)
         time.sleep(6)
         _dump(sb, "merrill_landing")
 
-        # From the landing nav, follow Holdings/Positions and Activity/History.
-        for label, needles in (("holdings", ("holding", "position")), ("activity", ("activity", "history", "transaction"))):
-            link = sb.cdp.evaluate(
-                "(() => { for (const a of document.querySelectorAll('a')) {"
-                f"  const t=(a.innerText||'').toLowerCase();"
-                f"  if ([{','.join(repr(n) for n in needles)}].some(n=>t.includes(n))) return a.href;"
-                "} return null; })()"
-            )
-            if link:
-                print(f"[nav] {label} -> {link}")
-                sb.cdp.open(link)
+        # Visit the known U.S. Trust portal pages directly (found in the landing
+        # HTML). One of these carries the transaction-level activity we need.
+        PB = "https://auth.privatebank.bankofamerica.com"
+        pages = {
+            "holdings": "/Holdings/HoldingsBySecurity.aspx",
+            "position_detail": "/Holdings/PositionDetail.aspx",
+            "income_gain_loss": "/Summary/IncomeGainLoss.aspx",
+            "portfolio_summary": "/Summary/PortfolioSummary.aspx",
+        }
+        for label, path in pages.items():
+            print(f"[nav] {label} -> {path}")
+            try:
+                sb.cdp.open(PB + path)
                 time.sleep(6)
                 sb.cdp.evaluate(HOOK_JS)
                 time.sleep(6)
                 _dump(sb, label)
-            else:
-                print(f"[nav] no {label} link found on landing page")
+            except Exception as exc:  # noqa: BLE001
+                print(f"    [!] {label} failed: {exc}")
 
 
 if __name__ == "__main__":
