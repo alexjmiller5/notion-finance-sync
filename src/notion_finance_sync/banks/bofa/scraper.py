@@ -24,7 +24,7 @@ import structlog
 from notion_finance_sync.banks._base import UnsupportedOperation  # noqa: F401  (protocol docs)
 from notion_finance_sync.banks.bofa import assemble, card, deposit, fetchers, rewards, session
 from notion_finance_sync.banks.bofa.categories import BOFA_LABEL_TO_CANONICAL
-from notion_finance_sync.models import AccountType, TransactionRecord
+from notion_finance_sync.models import AccountType, BankName, TransactionRecord
 
 logger = structlog.get_logger()
 
@@ -65,6 +65,7 @@ class BofAScraper:
     SESSION_ID = "bofa"
     BANK_DISPLAY_NAME = "BofA"
     SUPPORTS_LIVE = True
+    BANKS = {BankName.BANK_OF_AMERICA}  # scopes orphan release to this bank's rows
 
     # BankScraper protocol's CATEGORY_MAP (BofA label -> canonical).
     CATEGORY_MAP = BOFA_LABEL_TO_CANONICAL

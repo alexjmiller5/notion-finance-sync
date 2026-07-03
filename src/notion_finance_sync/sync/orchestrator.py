@@ -298,8 +298,11 @@ async def _run_one_attempt(
             record.review_status = compute_review_status(record)
         await client.update_from_record(page_id, record)
 
-    # 5. Orphan release (only after a clean scrape — see SPEC §9)
-    pending = filter_pending(existing)
+    # 5. Orphan release (only after a clean scrape — see SPEC §9). Scoped to the
+    #    scraper's declared BANKS so a single-bank sync never releases another
+    #    bank's pending rows (live incident 2026-07-03: the first bilt sync
+    #    released a U.S. Bank + a BofA pending row).
+    pending = filter_pending(existing, banks=getattr(scraper, "BANKS", None))
     orphans = detect_orphans(
         pending_notion_rows=pending,
         fresh_scrape_records=scraped,

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 
 import structlog
 
@@ -103,6 +104,19 @@ def _is_materially_different(record: TransactionRecord, existing_row: dict) -> b
         # Treat None and empty string as equivalent
         if (new_val in (None, "")) and (old_val in (None, "")):
             continue
+
+        # Notion stores datetimes at MINUTE precision and echoes them with
+        # milliseconds ("08:25:21" -> "08:25:00.000+00:00"); compare as datetimes
+        # truncated to the minute so timestamped rows don't perma-diff. Safe:
+        # both values describe the same source_id.
+        if isinstance(new_val, str) and isinstance(old_val, str) and "T" in new_val:
+            try:
+                new_dt = datetime.fromisoformat(new_val).replace(second=0, microsecond=0)
+                old_dt = datetime.fromisoformat(old_val).replace(second=0, microsecond=0)
+                if new_dt == old_dt:
+                    continue
+            except ValueError:
+                pass
 
         if new_val != old_val:
             return True

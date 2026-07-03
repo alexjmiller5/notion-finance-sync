@@ -33,3 +33,4 @@ config/cards.yaml
 # Real transaction data used only as local test fixtures (sensitive)
 tests/fixtures/bofa/*.html
 tests/fixtures/bofa/deposit_activity_raw.json
+tests/fixtures/bilt/transactions_v2.json

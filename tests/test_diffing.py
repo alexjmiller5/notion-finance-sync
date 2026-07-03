@@ -193,3 +193,44 @@ class TestDateEquivalence:
         existing = {"src-1": _row("src-1", transaction_date="2026-05-01")}
         result = build_transaction_changes(scraped=[record], existing=existing)
         assert len(result.to_update) == 1
+
+
+class TestTimestampNormalization:
+    """Notion echoes datetimes with milliseconds ("...T01:30:00.000+00:00");
+    records carry plain isoformat ("...T01:30:00+00:00"). These must compare
+    equal or every timestamped row (Bilt, Venmo) updates on every sync."""
+
+    def test_notion_millisecond_timestamp_is_unchanged(self):
+        from datetime import UTC, datetime
+
+        record = _record()
+        record.transacted_at = datetime(2026, 7, 3, 1, 30, tzinfo=UTC)
+        row = _row()
+        row["transacted_at"] = "2026-07-03T01:30:00.000+00:00"
+
+        changes = build_transaction_changes(scraped=[record], existing={"src-1": row})
+        assert changes.unchanged and not changes.to_update
+
+    def test_seconds_precision_is_ignored(self):
+        # Notion truncates to the minute ("08:25:21" -> "08:25:00.000") — a
+        # seconds-only difference must not count as an update.
+        from datetime import UTC, datetime
+
+        record = _record()
+        record.transacted_at = datetime(2026, 7, 3, 1, 30, 21, tzinfo=UTC)
+        row = _row()
+        row["transacted_at"] = "2026-07-03T01:30:00.000+00:00"
+
+        changes = build_transaction_changes(scraped=[record], existing={"src-1": row})
+        assert changes.unchanged and not changes.to_update
+
+    def test_genuinely_different_timestamp_still_updates(self):
+        from datetime import UTC, datetime
+
+        record = _record()
+        record.transacted_at = datetime(2026, 7, 3, 2, 45, tzinfo=UTC)
+        row = _row()
+        row["transacted_at"] = "2026-07-03T01:30:00.000+00:00"
+
+        changes = build_transaction_changes(scraped=[record], existing={"src-1": row})
+        assert changes.to_update and not changes.unchanged
