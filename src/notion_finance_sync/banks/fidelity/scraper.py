@@ -31,9 +31,9 @@ _ACCOUNTS = [
 # Fidelity's history endpoint caps the window at 365 days.
 _MAX_WINDOW_DAYS = 365
 
-# Curated Notion "Credit Card / Account" select value for the 401k. None until
-# the option exists in Notion (FINDINGS flags "Capital One 401k" for Alex).
-NOTION_ACCOUNT_401K: str | None = None
+# Curated Notion "Credit Card / Account" select value for the 401k. The option
+# was created in the live Transactions DB 2026-07-03.
+NOTION_ACCOUNT_401K: str | None = "Capital One 401k"
 
 ACCOUNT_NAME = "Capital One 401k ASP"
 
