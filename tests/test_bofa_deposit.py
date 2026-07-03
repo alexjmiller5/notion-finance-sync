@@ -29,9 +29,28 @@ def test_parses_all_transactions(raw):
     assert len(records) == 8
 
 
+def test_source_id_is_stable_and_token_independent(raw):
+    import copy
+
+    rec = deposit.parse_activity(raw)[0]
+    # deterministic: same input -> same id
+    assert deposit.parse_activity(copy.deepcopy(raw))[0].source_id == rec.source_id
+    # NOT derived from transactionToken (which BofA regenerates every session)
+    mutated = copy.deepcopy(raw)
+    mutated["payload"]["depositActivity"]["transactionList"]["transactions"][0][
+        "transactionToken"
+    ] = "totally-different-token"
+    assert deposit.parse_activity(mutated)[0].source_id == rec.source_id
+    # IS sensitive to real content (running balance changes the id)
+    mutated2 = copy.deepcopy(raw)
+    mutated2["payload"]["depositActivity"]["transactionList"]["transactions"][0][
+        "actualRunningBalanceAmount"
+    ] = "999999.99"
+    assert deposit.parse_activity(mutated2)[0].source_id != rec.source_id
+
+
 def test_first_transaction_fields(raw):
     rec = deposit.parse_activity(raw)[0]
-    assert rec.source_id == "c1ae4ef19be4fcca34b4a9e9fca74e3f798af38aae13bb56f620d3dae3335d34"
     assert rec.amount == -50.0
     assert rec.transaction_date == date(2026, 7, 1)
     assert rec.status == TransactionStatus.POSTED  # "Completed"
@@ -65,3 +84,18 @@ def test_signed_amounts_preserved(raw):
 def test_account_name_override(raw):
     records = deposit.parse_activity(raw, account_name="My Checking")
     assert records[0].account_name == "My Checking"
+
+
+def test_clean_description_trims_truncation_tail():
+    from notion_finance_sync.banks.bofa.deposit import _clean_description
+
+    assert (
+        _clean_description(' Zelle Recurring payment to Alexander Miller - EverBank for "regularly...')
+        == "Zelle Recurring payment to Alexander Miller - EverBank"
+    )
+    # non-truncated descriptions are untouched (aside from strip)
+    assert _clean_description(" Zelle payment to Trevor Conf# tw0n5t2yn ") == (
+        "Zelle payment to Trevor Conf# tw0n5t2yn"
+    )
+    # mutation guard: a real trailing word that isn't a connector stays
+    assert _clean_description("APPLE CASH DES:BANK XFER...") == "APPLE CASH DES:BANK XFER"

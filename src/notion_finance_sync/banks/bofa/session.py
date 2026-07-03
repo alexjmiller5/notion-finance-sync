@@ -118,6 +118,13 @@ def login_and_get_cookies(
         try:
             sb.activate_cdp_mode(LOGIN_URL)
 
+            # BofA has two login forms: the homepage widget (#oid/#pass, what we
+            # use) and a standalone sign-in page (signOnV2Screen.go, no #oid). If
+            # we get redirected to the latter, re-assert the homepage form once.
+            sb.cdp.sleep(3)
+            if not sb.cdp.is_element_present("#oid"):
+                sb.cdp.open(LOGIN_URL)
+
             # 1. Wait for the login widget to be interactable, dismiss any cookie
             #    banner (it can overlay the form so type/click silently no-op).
             sb.cdp.wait_for_element_visible("#oid", timeout=30)

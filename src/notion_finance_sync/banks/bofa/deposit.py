@@ -17,6 +17,7 @@ the payload carries.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 
@@ -36,6 +37,45 @@ _STATUS = {
     "posted": TransactionStatus.POSTED,
     "pending": TransactionStatus.PENDING,
 }
+
+
+def _stable_source_id(t: dict, account_id: str) -> str:
+    """Content-derived, session-stable id for a deposit txn.
+
+    BofA's ``transactionToken`` is REGENERATED every session (verified 2026-07-03:
+    0/250 overlap between two captures of the same account) — using it as the
+    source_id would create duplicate Notion rows on every sync. Hash stable fields
+    instead; ``actualRunningBalanceAmount`` disambiguates same-day/same-amount txns.
+    """
+    key = "|".join(
+        (
+            account_id,
+            str(t.get("formattedPostedDate", "")),
+            str(t.get("amount", {}).get("amount", "")),
+            str(t.get("actualRunningBalanceAmount", "")),
+            (t.get("preferredDescription") or t.get("customizedDescription") or "").strip(),
+        )
+    )
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def _clean_description(desc: str) -> str:
+    """Trim BofA's server-side truncation tail.
+
+    The checking activity API truncates long descriptions to ~64 chars ending in
+    ``...`` (the full text isn't exposed anywhere — no per-txn detail endpoint,
+    verified 2026-07-03). When truncated, drop the dangling cut-off fragment so
+    the name reads cleanly instead of ``... - EverBank for "regularly...``.
+    """
+    desc = desc.strip()
+    if not desc.endswith("..."):
+        return desc
+    desc = desc[:-3].rstrip()
+    if desc.count('"') % 2 == 1:  # unterminated quote from the cut → drop it
+        desc = desc[: desc.rfind('"')].rstrip()
+    # drop a trailing dangling connector word ("... EverBank for")
+    desc = re.sub(r"[\s\-]+(for|to|at|on|from|with|the|a|an|of)\s*$", "", desc, flags=re.I)
+    return desc.rstrip(" -")
 
 
 def _parse_date(s: str):
@@ -67,7 +107,9 @@ def parse_activity(
     records: list[TransactionRecord] = []
     for t in txns:
         acct = t.get("accountIdentifier", {})
-        desc = (t.get("customizedDescription") or t.get("preferredDescription") or "").strip()
+        desc = _clean_description(
+            t.get("customizedDescription") or t.get("preferredDescription") or ""
+        )
 
         code = t.get("spendingCategoryCode")
         bank_label = categories.BOFA_CATEGORY_CODE_TO_LABEL.get(str(code)) if code else None
@@ -77,7 +119,7 @@ def parse_activity(
 
         records.append(
             TransactionRecord(
-                source_id=t["transactionToken"],
+                source_id=_stable_source_id(t, source_account_id or acct.get("adxid", "")),
                 source_account_id=source_account_id or acct.get("adxid", ""),
                 name=desc,
                 amount=float(t["amount"]["amount"]),
