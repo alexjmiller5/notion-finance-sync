@@ -34,3 +34,4 @@ config/cards.yaml
 tests/fixtures/bofa/*.html
 tests/fixtures/bofa/deposit_activity_raw.json
 tests/fixtures/bilt/transactions_v2.json
+tests/fixtures/bilt/loyalty_activity.json

@@ -138,3 +138,97 @@ def test_fetch_windows_never_exceed_limit():
     # contiguous, no gaps or overlaps
     for (_, e1), (s2, _) in zip(windows, windows[1:], strict=False):
         assert (s2 - e1).days == 1
+
+
+# ---------------------------------------------------------------------------
+# true_rewards matching from /loyalty/activity (SPEC §11: Bilt Blue per-txn
+# points are scraped inline). Fixture is the real captured feed (gitignored).
+# ---------------------------------------------------------------------------
+
+LOYALTY_FIXTURE = Path(__file__).parent / "fixtures" / "bilt" / "loyalty_activity.json"
+
+
+@pytest.fixture
+def matched(raw):
+    records = bilt.parse_transactions(raw)
+    entries = json.loads(LOYALTY_FIXTURE.read_text())["entries"]
+    bilt.match_true_rewards(records, entries)
+    return records
+
+
+def _rec(matched, source_id):
+    return next(r for r in matched if r.source_id == source_id)
+
+
+def test_purchase_points_matched_by_merchant_name(matched):
+    # NY Grill & Deli $17.68 -> +17 pts (feed title == merchant name)
+    assert _rec(matched, "2f0e54f7-addb-55c6-ada6-2b795512984a").true_rewards == 17
+
+
+def test_points_matched_despite_fx_amount_difference(matched):
+    # Mercado Pago: feed amount 341.55 (pre-FX) vs txn 342.23 — name match wins
+    rec = next(r for r in matched if r.name == "Mercado Pago Ticketmas")
+    assert rec.true_rewards == 341
+
+
+def test_housing_points_matched_to_rent_purchases_by_date(matched):
+    # Housing Points entries carry no amount; matched to the rent purchase
+    # nearest in date: Feb -> 3763, Apr -> 48, Jun -> 1.
+    rents = sorted(
+        (r for r in matched if r.category == CanonicalCategory.RENT and r.amount < 0),
+        key=lambda r: r.transaction_date,
+    )
+    by_month = {r.transaction_date.month: r.true_rewards for r in rents}
+    assert by_month[2] == 3763
+    assert by_month[4] == 48
+    assert by_month[6] == 1
+
+
+def test_payments_never_get_rewards(matched):
+    for r in matched:
+        if r.amount > 0:
+            assert r.true_rewards is None
+
+
+def test_unmatched_purchases_stay_none(matched):
+    # July rent purchase has no Housing Points feed entry yet
+    july_rent = next(
+        r
+        for r in matched
+        if r.category == CanonicalCategory.RENT and r.amount < 0 and r.transaction_date.month == 7
+    )
+    assert july_rent.true_rewards is None
+
+
+def test_cross_card_entries_never_match_bilt_records(raw):
+    # A DINING (cross-card) feed entry whose name collides with a Bilt txn must
+    # NOT set true_rewards — those points belong on another bank's row.
+    records = bilt.parse_transactions(raw)
+    entries = [
+        {
+            "title": "NY Grill & Deli",
+            "category": "DINING",
+            "pointState": "EARNED",
+            "totalPoints": 999,
+            "datetime": "2026-02-07T12:00:00Z",
+        }
+    ]
+    bilt.match_true_rewards(records, entries)
+    rec = next(r for r in records if r.source_id == "2f0e54f7-addb-55c6-ada6-2b795512984a")
+    assert rec.true_rewards is None
+
+
+def test_entry_outside_date_window_does_not_match(raw):
+    # Housing Points entry weeks away from any rent purchase -> no match.
+    records = bilt.parse_transactions(raw)
+    entries = [
+        {
+            "title": "Housing Points",
+            "category": "BILT_MC",
+            "pointState": "EARNED",
+            "totalPoints": 500,
+            "datetime": "2026-03-15T12:00:00Z",
+        }
+    ]
+    bilt.match_true_rewards(records, entries)
+    assert all(r.true_rewards is None for r in records)

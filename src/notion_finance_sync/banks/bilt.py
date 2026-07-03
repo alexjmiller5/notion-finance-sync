@@ -120,6 +120,54 @@ def parse_transactions(
     return records
 
 
+def match_true_rewards(records: list[TransactionRecord], entries: list[dict]) -> None:
+    """Set ``true_rewards`` on card records from the ``/loyalty/activity`` feed.
+
+    Bilt-card earnings are the feed's ``category == "BILT_MC"`` + EARNED entries
+    (SPEC §11: Bilt Blue per-txn points are scraped inline). The feed has no
+    transaction id, so entries correlate by merchant name + date (±3 days) —
+    amounts can differ (points accrue on the pre-FX amount). "Housing Points"
+    entries carry no amount/merchant and match the nearest rent purchase by date.
+
+    Cross-card entries (DINING / RIDESHARE etc.) are NOT consumed here — they
+    belong to other banks' rows via the Phase-2 ``bilt_portal`` enricher.
+    """
+    spends = [r for r in records if r.amount < 0]
+    matched: set[str] = set()
+
+    def entry_date(e: dict) -> date:
+        dt = datetime.fromisoformat(e["datetime"].replace("Z", "+00:00"))
+        return dt.astimezone(_EASTERN).date()
+
+    def nearest(candidates: list[TransactionRecord], e_date: date) -> TransactionRecord | None:
+        pool = [
+            r
+            for r in candidates
+            if r.source_id not in matched and abs((r.transaction_date - e_date).days) <= 3
+        ]
+        return min(pool, key=lambda r: abs((r.transaction_date - e_date).days), default=None)
+
+    for e in entries:
+        if e.get("category") != "BILT_MC" or e.get("pointState") != "EARNED":
+            continue
+        e_date = entry_date(e)
+        names = {(e.get("title") or "").casefold(), (e.get("rawTitle") or "").casefold()} - {""}
+
+        if e.get("title") == "Housing Points":
+            candidates = [r for r in spends if r.category == CanonicalCategory.RENT]
+        else:
+            candidates = [
+                r
+                for r in spends
+                if r.payee.casefold() in names
+                or (r.raw_data.get("merchant") or {}).get("rawName", "").casefold() in names
+            ]
+        rec = nearest(candidates, e_date)
+        if rec is not None:
+            rec.true_rewards = float(e.get("totalPoints") or 0)
+            matched.add(rec.source_id)
+
+
 def _date_windows(start: date, end: date) -> list[tuple[date, date]]:
     """Chunk [start, end] into contiguous <=90-day windows (API range limit)."""
     windows: list[tuple[date, date]] = []
@@ -291,6 +339,16 @@ def fetch_cards(client: httpx.Client) -> list[dict]:
     return resp.json()
 
 
+def fetch_loyalty_activity(client: httpx.Client) -> list[dict]:
+    """Fetch the points-activity feed (per-txn Bilt-card points + cross-card).
+
+    No pagination/date params observed — returns the member's full feed.
+    """
+    resp = client.get("/loyalty/activity")
+    resp.raise_for_status()
+    return resp.json().get("entries", [])
+
+
 def fetch_transactions(client: httpx.Client, card_id: str, start: date, end: date) -> dict:
     """Fetch all pages for one <=90-day window; returns the merged response dict."""
     settled: list[dict] = []
@@ -362,6 +420,10 @@ class BiltScraper:
                     if rec.source_id not in seen:
                         seen.add(rec.source_id)
                         records.append(rec)
+            try:
+                match_true_rewards(records, fetch_loyalty_activity(client))
+            except Exception as exc:  # noqa: BLE001 — rewards are best-effort enrichment
+                logger.warning("bilt_loyalty_activity_failed", error=str(exc))
         records = [r for r in records if start <= r.transaction_date <= end]
         logger.info("bilt_scraped", count=len(records), start=str(start), end=str(end))
         return records
