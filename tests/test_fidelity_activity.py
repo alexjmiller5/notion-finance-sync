@@ -30,10 +30,21 @@ def raw() -> dict:
 
 
 def test_skips_change_in_market_value(raw):
-    # 7 rows in fixture, 1 is realizedGainLoss "Change in Market Value" -> dropped.
+    # 8 rows in fixture, 1 is realizedGainLoss "Change in Market Value" -> dropped.
     records = activity.parse_activity(raw)
-    assert len(records) == 6
+    assert len(records) == 7
     assert all(r.bank_category != "Change in Market Value" for r in records)
+
+
+def test_only_acct_filters_foreign_account(raw):
+    # The fixture includes a Roth IRA (acct 259079998) row; the 401k module must
+    # drop it when only_acct is set to the 401k account.
+    all_recs = activity.parse_activity(raw)
+    assert any(r.source_account_id == "259079998" for r in all_recs)  # present unfiltered
+
+    only_401k = activity.parse_activity(raw, only_acct="30072")
+    assert len(only_401k) == 6
+    assert all(r.source_account_id == "30072" for r in only_401k)
 
 
 def test_contribution_fields(raw):

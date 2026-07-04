@@ -21,11 +21,20 @@ from notion_finance_sync.models import TransactionRecord
 
 logger = structlog.get_logger()
 
-# Accounts under the login. acctName is base64 (required by the API); acctType
-# is the API's own code (WPS = workplace/defined-contributions).
+# This module is scoped to the 401k ONLY (brief: "Fidelity = 401k").
+_ACCT_401K = "30072"
+
+# Accounts requested from the API. acctName is base64 (required by the API);
+# acctType is the API's own code (WPS = workplace/defined-contributions).
+#
+# The login also exposes a Fidelity Roth IRA (acct 259079998, acctName base64
+# "ROTH IRA"). It's OUT of scope here — it's a different account type with its
+# own history (a 2025 $7k contribution, fund buys/dividends, then an ACAT
+# transfer-out), and mislabeling it as 401k is wrong. It belongs to a separate
+# module (see fidelity_ira_closed.py / SPEC §16). We both omit it from the
+# request AND filter defensively in the parser (only_acct=_ACCT_401K).
 _ACCOUNTS = [
-    {"acctNum": "259079998", "acctName": "Uk9USCBJUkE=", "acctType": "Brokerage"},
-    {"acctNum": "30072", "acctName": "Q0FQSVRBTCBPTkUgNDAxSyBBU1A=", "acctType": "WPS"},
+    {"acctNum": _ACCT_401K, "acctName": "Q0FQSVRBTCBPTkUgNDAxSyBBU1A=", "acctType": "WPS"},
 ]
 
 # Fidelity's history endpoint caps the window at 365 days.
@@ -84,6 +93,7 @@ class FidelityScraper:
             raw,
             account_name=ACCOUNT_NAME,
             credit_card_account=NOTION_ACCOUNT_401K,
+            only_acct=_ACCT_401K,
         )
         records = [r for r in records if r.transaction_date and start <= r.transaction_date <= end]
         logger.info("fidelity_scraped", count=len(records), start=str(start), end=str(end))

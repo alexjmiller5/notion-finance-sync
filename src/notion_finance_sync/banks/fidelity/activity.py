@@ -74,6 +74,7 @@ def parse_activity(
     account_name: str = "Capital One 401k ASP",
     source_account_id: str | None = None,
     credit_card_account: str | None = None,
+    only_acct: str | None = None,
 ) -> list[TransactionRecord]:
     """Parse a `transactions/history` response into TransactionRecords.
 
@@ -84,10 +85,15 @@ def parse_activity(
             row's ``acctNum``).
         credit_card_account: curated Notion select value. Left ``None`` until the
             "Capital One 401k" option exists in Notion (see FINDINGS).
+        only_acct: if set, keep only rows whose ``acctNum`` matches. The login
+            exposes multiple accounts (401k + Roth IRA); this module is 401k-only.
     """
     txns = raw.get("data", {}).get("transactions", [])
     records: list[TransactionRecord] = []
     for t in txns:
+        if only_acct is not None and str(t.get("acctNum", "")) != only_acct:
+            continue
+
         cat = t.get("catDetail", {})
         cat_desc = cat.get("txnCatDesc", "")
         if cat_desc in _SKIP_CATDESC:
