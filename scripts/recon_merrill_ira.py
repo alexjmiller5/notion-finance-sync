@@ -29,23 +29,26 @@ from notion_finance_sync.twofa.sms import get_sms_code
 OUT = Path("data/snapshots/bofa/merrill_ira_recon")
 
 HOOK_JS = """
-window.__recon = [];
-const of = window.fetch;
-window.fetch = async function(i, init) {
-    const url = typeof i === 'string' ? i : i.url;
-    const body = init && init.body ? String(init.body) : null;
-    const r = await of.apply(this, arguments);
-    let t = null; try { t = await r.clone().text(); } catch (e) {}
-    window.__recon.push({url, method:(init&&init.method)||'GET', body, status:r.status, response:t});
-    return r;
-};
-const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.open = function(m,u){ this.__m=m; this.__u=u; return oo.apply(this,arguments); };
-XMLHttpRequest.prototype.send = function(b){
-    this.addEventListener('load', () => window.__recon.push(
-        {url:this.__u, method:this.__m, body:b?String(b):null, status:this.status, response:this.responseText}));
-    return os.apply(this, arguments);
-};
+if (!window.__reconHooked) {
+  window.__reconHooked = true;
+  window.__recon = window.__recon || [];
+  const origFetch = window.fetch;
+  window.fetch = async function(i, init) {
+      const url = typeof i === 'string' ? i : i.url;
+      const body = init && init.body ? String(init.body) : null;
+      const r = await origFetch.apply(this, arguments);
+      let t = null; try { t = await r.clone().text(); } catch (e) {}
+      window.__recon.push({url, method:(init&&init.method)||'GET', body, status:r.status, response:t});
+      return r;
+  };
+  const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(m,u){ this.__m=m; this.__u=u; return oo.apply(this,arguments); };
+  XMLHttpRequest.prototype.send = function(b){
+      this.addEventListener('load', () => window.__recon.push(
+          {url:this.__u, method:this.__m, body:b?String(b):null, status:this.status, response:this.responseText}));
+      return os.apply(this, arguments);
+  };
+}
 """
 
 
@@ -126,25 +129,33 @@ def main() -> None:
         time.sleep(6)
         _dump(sb, "merrill_landing")
 
-        # Visit the known U.S. Trust portal pages directly (found in the landing
-        # HTML). One of these carries the transaction-level activity we need.
+        # The ACTIVITY feed (Alex found it): /TFPActivity/Activity.aspx — has a
+        # time-period filter ("All available") + expandable per-row detail titles.
         PB = "https://auth.privatebank.bankofamerica.com"
-        pages = {
-            "holdings": "/Holdings/HoldingsBySecurity.aspx",
-            "position_detail": "/Holdings/PositionDetail.aspx",
-            "income_gain_loss": "/Summary/IncomeGainLoss.aspx",
-            "portfolio_summary": "/Summary/PortfolioSummary.aspx",
-        }
-        for label, path in pages.items():
-            print(f"[nav] {label} -> {path}")
-            try:
-                sb.cdp.open(PB + path)
-                time.sleep(6)
-                sb.cdp.evaluate(HOOK_JS)
-                time.sleep(6)
-                _dump(sb, label)
-            except Exception as exc:  # noqa: BLE001
-                print(f"    [!] {label} failed: {exc}")
+        sb.cdp.open(PB + "/TFPActivity/Activity.aspx?as_cd=1.1.1.1")
+        time.sleep(8)
+        sb.cdp.evaluate(HOOK_JS)
+        time.sleep(4)
+        _dump(sb, "activity_default")
+
+        # Set the time-period dropdown to "All available", then re-capture.
+        picked = sb.cdp.evaluate(
+            "(() => { for (const s of document.querySelectorAll('select')) {"
+            "  for (const o of s.options) { if (/all\\s*avail/i.test(o.text)) {"
+            "    s.value=o.value; s.dispatchEvent(new Event('change',{bubbles:true}));"
+            "    return s.id+' => '+o.text; } } } return 'no all-available select'; })()"
+        )
+        print(f"[filter] {picked}")
+        time.sleep(10)  # ASP.NET postback / ajax reload
+        sb.cdp.evaluate(HOOK_JS)
+        time.sleep(4)
+        # Expand every per-row detail toggle to reveal full line titles.
+        expanded = sb.cdp.evaluate(
+            "(() => { const a=[...document.querySelectorAll('a[id$=_Exp]')]; a.forEach(x=>{try{x.click()}catch(e){}}); return a.length; })()"
+        )
+        print(f"[expand] clicked {expanded} detail toggles")
+        time.sleep(5)
+        _dump(sb, "activity_all")
 
 
 if __name__ == "__main__":
