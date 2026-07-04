@@ -112,69 +112,84 @@ def login_and_get_cookies(
         interactive: pause for manual intervention on unexpected challenges
             (e.g. a 2FA code that couldn't be auto-read from Messages).
     """
-    username, password = _resolve_credentials(session_id, auth)
-
     with open_session(session_id) as sb:
         try:
-            sb.activate_cdp_mode(LOGIN_URL)
-
-            # BofA has two login forms: the homepage widget (#oid/#pass, what we
-            # use) and a standalone sign-in page (signOnV2Screen.go, no #oid). If
-            # we get redirected to the latter, re-assert the homepage form once.
-            sb.cdp.sleep(3)
-            if not sb.cdp.is_element_present("#oid"):
-                sb.cdp.open(LOGIN_URL)
-
-            # 1. Wait for the login widget to be interactable, dismiss any cookie
-            #    banner (it can overlay the form so type/click silently no-op).
-            sb.cdp.wait_for_element_visible("#oid", timeout=30)
-            for sel in ("#onetrust-accept-btn-handler", "#engagementBannerCloseBtn"):
-                try:
-                    sb.cdp.click_if_visible(sel)
-                except Exception:  # noqa: BLE001 — best-effort dismissal
-                    pass
-
-            # 2. Credentials. Timestamp before submit so we only match a code that
-            #    arrives after this login attempt (BofA sends it during/after submit).
-            sb.cdp.type("#oid", username)
-            sb.cdp.type("#pass", password)
-            code_requested_at = datetime.now(tz=UTC)
-            sb.cdp.click("#secure-signin-submit")
-
-            # 3. 2FA — BofA ALWAYS challenges (no device trust). Wait for either the
-            #    delivery-select page or (rarely) the code-entry page directly.
-            sb.cdp.wait_for_any_of_elements_present(
-                ["#authcodeTextReceive", "#ahAuthcodeValidateOTP"], timeout=45
-            )
-            if sb.cdp.is_element_present("#authcodeTextReceive"):
-                sb.cdp.click("#authcodeTextReceive")  # text-message delivery
-                code_requested_at = datetime.now(tz=UTC)
-                sb.cdp.click("#ah-authcode-select-continue-btn")  # sends the SMS
-                sb.cdp.wait_for_element_visible("#ahAuthcodeValidateOTP", timeout=45)
-
-            code = get_sms_code(
-                after=code_requested_at,
-                sender_pattern=BOFA_SMS_SENDER,
-                code_regex=BOFA_SMS_REGEX,
-                timeout_s=150,
-            )
-            if not code:
-                if interactive:
-                    input("2FA code not auto-read. Enter it in the browser, then press ENTER... ")
-                else:
-                    raise RuntimeError("BofA 2FA code was not received within timeout")
-            else:
-                sb.cdp.type("#ahAuthcodeValidateOTP", code)
-                sb.cdp.click("#ah-authcode-validate-continue-btn")
-
-            # 4. Logged in.
-            sb.cdp.wait_for_text(OVERVIEW_MARKER, timeout=60)
+            perform_login(sb, session_id=session_id, auth=auth, interactive=interactive)
             cookies = _cookies_to_dict(sb.cdp.get_all_cookies())
             logger.info("bofa_login_ok", session_id=session_id, cookie_count=len(cookies))
             return cookies
         except Exception:
             _login_failure_screenshot(sb, session_id)
             raise
+
+
+def perform_login(
+    sb,
+    *,
+    session_id: str = "bofa",
+    auth: AuthMode = "service_account",
+    interactive: bool = False,
+) -> None:
+    """Drive an already-open SeleniumBase session through BofA login + 2FA.
+
+    Leaves the browser on the Accounts Overview page (session live) so callers
+    that need more than cookies — e.g. the investments scraper's gcslsso SSO —
+    can keep navigating. ``login_and_get_cookies`` wraps this and returns cookies.
+    """
+    username, password = _resolve_credentials(session_id, auth)
+    sb.activate_cdp_mode(LOGIN_URL)
+
+    # BofA has two login forms: the homepage widget (#oid/#pass, what we use) and
+    # a standalone sign-in page (signOnV2Screen.go, no #oid). If we get redirected
+    # to the latter, re-assert the homepage form once.
+    sb.cdp.sleep(3)
+    if not sb.cdp.is_element_present("#oid"):
+        sb.cdp.open(LOGIN_URL)
+
+    # 1. Wait for the login widget, dismiss any cookie banner (it can overlay the
+    #    form so type/click silently no-op).
+    sb.cdp.wait_for_element_visible("#oid", timeout=30)
+    for sel in ("#onetrust-accept-btn-handler", "#engagementBannerCloseBtn"):
+        try:
+            sb.cdp.click_if_visible(sel)
+        except Exception:  # noqa: BLE001 — best-effort dismissal
+            pass
+
+    # 2. Credentials. Timestamp before submit so we only match a code that arrives
+    #    after this login attempt (BofA sends it during/after submit).
+    sb.cdp.type("#oid", username)
+    sb.cdp.type("#pass", password)
+    code_requested_at = datetime.now(tz=UTC)
+    sb.cdp.click("#secure-signin-submit")
+
+    # 3. 2FA — BofA ALWAYS challenges (no device trust). Wait for either the
+    #    delivery-select page or (rarely) the code-entry page directly.
+    sb.cdp.wait_for_any_of_elements_present(
+        ["#authcodeTextReceive", "#ahAuthcodeValidateOTP"], timeout=45
+    )
+    if sb.cdp.is_element_present("#authcodeTextReceive"):
+        sb.cdp.click("#authcodeTextReceive")  # text-message delivery
+        code_requested_at = datetime.now(tz=UTC)
+        sb.cdp.click("#ah-authcode-select-continue-btn")  # sends the SMS
+        sb.cdp.wait_for_element_visible("#ahAuthcodeValidateOTP", timeout=45)
+
+    code = get_sms_code(
+        after=code_requested_at,
+        sender_pattern=BOFA_SMS_SENDER,
+        code_regex=BOFA_SMS_REGEX,
+        timeout_s=150,
+    )
+    if not code:
+        if interactive:
+            input("2FA code not auto-read. Enter it in the browser, then press ENTER... ")
+        else:
+            raise RuntimeError("BofA 2FA code was not received within timeout")
+    else:
+        sb.cdp.type("#ahAuthcodeValidateOTP", code)
+        sb.cdp.click("#ah-authcode-validate-continue-btn")
+
+    # 4. Logged in.
+    sb.cdp.wait_for_text(OVERVIEW_MARKER, timeout=60)
 
 
 def _cookies_to_dict(raw_cookies) -> dict[str, str]:

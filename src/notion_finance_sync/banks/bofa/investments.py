@@ -111,7 +111,11 @@ def _activity_source_id(
 
 
 def parse_activity(
-    html: str, *, account_name: str, source_account_id: str = ""
+    html: str,
+    *,
+    account_name: str,
+    source_account_id: str = "",
+    account_type: AccountType = AccountType.IRA,
 ) -> list[TransactionRecord]:
     """Parse the IRA Activity feed (/TFPActivity/Activity.aspx) into records.
 
@@ -167,7 +171,7 @@ def parse_activity(
                 bank_category=f"{major}: {minor}",
                 category=_MINOR_TO_CATEGORY.get(minor.strip().lower()),
                 bank=BankName.BANK_OF_AMERICA,
-                account_type=AccountType.IRA,
+                account_type=account_type,
                 account_name=account_name,
                 quantity=quantity if quantity else None,
                 raw_data={"major": major, "minor": minor, "detail": detail},
