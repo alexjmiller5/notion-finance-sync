@@ -68,9 +68,18 @@ def _set_period(sb, period: str) -> str:
     try:
         sb.cdp.select_option_by_value(_PERIOD_SELECT, _PERIOD_VALUE[period])
     except Exception:  # noqa: BLE001 — fall back to matching by visible text
-        sb.cdp.select_option_by_text(_PERIOD_SELECT, _PERIOD_TEXT[period])
-    sb.cdp.sleep(14)  # ProcessDropdownChange postback + grid reload
-    return _PERIOD_TEXT[period]
+        try:
+            sb.cdp.select_option_by_text(_PERIOD_SELECT, _PERIOD_TEXT[period])
+        except Exception:  # noqa: BLE001
+            pass
+    sb.cdp.sleep(16)  # ProcessDropdownChange postback + grid reload
+    # Report the option the server actually rendered as selected (the hardcoded
+    # label lied before — this reflects whether the postback really applied).
+    actual = sb.cdp.evaluate(
+        "(() => { const s = document.querySelector(\"select[id*='dateControlSelectDates']\");"
+        " return s && s.selectedIndex >= 0 ? s.options[s.selectedIndex].text : 'NO-SELECT'; })()"
+    )
+    return actual if isinstance(actual, str) else str(actual)
 
 
 class BofAInvestmentsScraper:
