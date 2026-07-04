@@ -222,9 +222,9 @@ def make_schema(
             "type": "checkbox",
             "checkbox": {},
         }
-        properties["Excluded from Spending"] = {
+        properties["Excluded"] = {
             "id": "exs",
-            "name": "Excluded from Spending",
+            "name": "Excluded",
             "type": "checkbox",
             "checkbox": {},
         }

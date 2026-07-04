@@ -347,13 +347,13 @@ class TestCheckboxAlwaysEmitted:
         record = make_sparse_record()
         assert record.excluded_from_spending is False
         props = encode_transaction(record)
-        assert props["Excluded from Spending"] == {"checkbox": False}
+        assert props["Excluded"] == {"checkbox": False}
 
     def test_excluded_from_spending_true_emitted(self):
         record = make_sparse_record()
         record.excluded_from_spending = True
         props = encode_transaction(record)
-        assert props["Excluded from Spending"] == {"checkbox": True}
+        assert props["Excluded"] == {"checkbox": True}
 
 
 class TestReviewStatusEncoding:

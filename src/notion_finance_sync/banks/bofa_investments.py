@@ -11,6 +11,7 @@ NOT written — transactions are the source of truth; value is a frontend concer
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -29,12 +30,10 @@ _ACTIVITY_URL = _PB + "/TFPActivity/Activity.aspx?as_cd=1.1.1.1"
 _SSO_RE = re.compile(
     r'href="([^"]*target=gcslsso[^"]*target_page=accountsummary[^"]*common_hash=[^"]*)"'
 )
-# Option-text substrings to try for each period (first match wins; "all" appended
-# as fallback so a daily run never accidentally scrapes nothing).
-_PERIOD_NEEDLES = {
-    "recent": ["last 30", "past 30", "30 day"],
-    "all": ["all avail"],
-}
+# The Activity date-range <select> (option value -> what to pick per period).
+_PERIOD_SELECT = "select[id*='dateControlSelectDates']"
+_PERIOD_VALUE = {"recent": "last30", "all": "all"}
+_PERIOD_TEXT = {"recent": "Last 30 Days", "all": "All Available"}
 
 
 @dataclass(frozen=True)
@@ -45,34 +44,33 @@ class _Account:
     source_account_id: str
 
 
-def _detect_account(html: str) -> _Account | None:
-    if "(ROTH)" in html or "IRA ALEXANDER" in html:
-        return _Account(
-            "BofA Roth IRA", "IRA ALEXANDER MILLER (ROTH)", AccountType.IRA, "bofa-roth-ira"
-        )
-    if "IM ALEXANDER" in html:
-        return _Account(
-            "BofA Investment Management", "IM ALEXANDER MILLER", AccountType.BROKERAGE, "bofa-im"
-        )
+_IRA = _Account("BofA Roth IRA", "IRA ALEXANDER MILLER (ROTH)", AccountType.IRA, "bofa-roth-ira")
+_IM = _Account(
+    "BofA Investment Management", "IM ALEXANDER MILLER", AccountType.BROKERAGE, "bofa-im"
+)
+def _account_for(switcher_text: str) -> _Account | None:
+    """Map a portal account-switcher link's text to the account it selects."""
+    t = switcher_text.upper()
+    if "ROTH" in t or "IRA ALEXANDER" in t:
+        return _IRA
+    if "IM ALEXANDER" in t or t.strip().startswith("IM"):
+        return _IM
     return None
 
 
 def _set_period(sb, period: str) -> str:
-    """Set the Activity time-period <select>; returns the option text picked."""
-    needles = _PERIOD_NEEDLES[period] + _PERIOD_NEEDLES["all"]  # fall back to All Available
-    picked = sb.cdp.evaluate(
-        "(() => {"
-        f"  const needles = {needles!r};"
-        "  for (const n of needles) {"
-        "    for (const s of document.querySelectorAll('select')) {"
-        "      for (const o of s.options) {"
-        "        if (o.text.toLowerCase().includes(n)) {"
-        "          s.value = o.value; s.dispatchEvent(new Event('change', {bubbles:true}));"
-        "          return o.text; } } } }"
-        "  return 'NONE'; })()"
-    )
-    sb.cdp.sleep(10)  # ASP.NET UpdatePanel reload
-    return picked if isinstance(picked, str) else str(picked)
+    """Set the Activity date-range <select> via a NATIVE selection.
+
+    The select's ``onchange="ProcessDropdownChange()"`` (defined in external JS)
+    does the postback; a JS ``value=...`` shim doesn't trigger it, so use
+    SeleniumBase's native select which fires the real change event.
+    """
+    try:
+        sb.cdp.select_option_by_value(_PERIOD_SELECT, _PERIOD_VALUE[period])
+    except Exception:  # noqa: BLE001 — fall back to matching by visible text
+        sb.cdp.select_option_by_text(_PERIOD_SELECT, _PERIOD_TEXT[period])
+    sb.cdp.sleep(14)  # ProcessDropdownChange postback + grid reload
+    return _PERIOD_TEXT[period]
 
 
 class BofAInvestmentsScraper:
@@ -87,23 +85,36 @@ class BofAInvestmentsScraper:
         with open_session(self.SESSION_ID) as sb:
             try:
                 session.perform_login(sb, session_id=self.SESSION_ID)
+                # SSO once into the private bank, then switch accounts via the
+                # portal's own switcher (as_cd query param) — re-SSO doesn't switch.
                 overview = sb.cdp.evaluate("document.documentElement.outerHTML") or ""
                 hrefs = [h.replace("&amp;", "&") for h in _SSO_RE.findall(overview)]
                 logger.info("bofa_inv_sso_links", count=len(hrefs))
+                if not hrefs:
+                    return []
+                sb.cdp.open("https://secure.bankofamerica.com" + hrefs[0])
+                sb.cdp.sleep(10)  # gcslsso -> private-bank redirect chain
+                sb.cdp.open(_ACTIVITY_URL)
+                sb.cdp.sleep(6)
+
+                switcher = sb.cdp.evaluate(
+                    "JSON.stringify([...document.querySelectorAll('a[id^=\"act_act_\"]')]"
+                    ".map(a => ({href: a.getAttribute('href'), text: (a.innerText||'').trim()})))"
+                )
+                links = json.loads(switcher) if isinstance(switcher, str) else (switcher or [])
+                logger.info("bofa_inv_accounts", count=len(links))
 
                 records: list[TransactionRecord] = []
                 seen: set[str] = set()
-                for href in hrefs:
-                    sb.cdp.open("https://secure.bankofamerica.com" + href)
-                    sb.cdp.sleep(10)  # gcslsso -> private-bank redirect chain
-                    sb.cdp.open(_ACTIVITY_URL)
-                    sb.cdp.sleep(6)
-                    picked = _set_period(sb, period)
-                    html = sb.cdp.evaluate("document.documentElement.outerHTML") or ""
-                    acct = _detect_account(html)
+                for link in links:
+                    acct = _account_for(link.get("text", ""))
                     if acct is None or acct.source_account_id in seen:
                         continue
                     seen.add(acct.source_account_id)
+                    sb.cdp.open(_PB + "/TFPActivity/" + link["href"])  # as_cd switches account
+                    sb.cdp.sleep(6)
+                    picked = _set_period(sb, period)
+                    html = sb.cdp.evaluate("document.documentElement.outerHTML") or ""
                     recs = investments.parse_activity(
                         html,
                         account_name=acct.account_name,

@@ -130,7 +130,7 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
             "type": "checkbox",
             "checkbox": {},
         },
-        "Excluded from Spending": {
+        "Excluded": {
             "type": "checkbox",
             "checkbox": {},
         },

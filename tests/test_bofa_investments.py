@@ -84,18 +84,18 @@ def test_activity_source_id_stable(activity_html):
     assert all(len(r.source_id) == 64 for r in a)
 
 
-def test_detect_account_maps_ira_and_im():
-    from notion_finance_sync.banks.bofa_investments import _detect_account
+def test_account_for_switcher_text():
+    from notion_finance_sync.banks.bofa_investments import _account_for
     from notion_finance_sync.models import AccountType
 
-    ira = _detect_account("... IRA ALEXANDER MILLER (ROTH) 0217337 ...")
+    ira = _account_for("Go To Account IRA ALEXANDER MILLER (ROTH) 0217337")
     assert ira is not None
     assert ira.notion_label == "BofA Roth IRA"
     assert ira.account_type == AccountType.IRA
 
-    im = _detect_account("... IM ALEXANDER MILLER - 8074 ...")
+    im = _account_for("Go To Account IM ALEXANDER MILLER 0218074")
     assert im is not None
     assert im.notion_label == "BofA Investment Management"
     assert im.account_type == AccountType.BROKERAGE
 
-    assert _detect_account("some checking account page") is None
+    assert _account_for("Some Checking Account") is None
