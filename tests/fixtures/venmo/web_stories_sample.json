@@ -1,0 +1,63 @@
+{
+  "nextId": "4600000000000000000",
+  "stories": [
+    {
+      "id": "4633391919166609215",
+      "paymentId": "4633391918126250791",
+      "type": "payment",
+      "subType": "none",
+      "amount": "- $7.61",
+      "date": "2026-07-03T20:42:38",
+      "audience": "private",
+      "note": {"content": "Amazon"},
+      "title": {
+        "titleType": "story",
+        "payload": {"action": "pay", "subType": "p2p"},
+        "sender": {"id": "1111111111111111111", "displayName": "you", "username": "alexm521", "type": ""},
+        "receiver": {"id": "2222222222222222222", "displayName": "Jordan Rivera", "username": "jordanr", "type": ""}
+      }
+    },
+    {
+      "id": "4632115520812142999",
+      "paymentId": "4632115519000000000",
+      "type": "payment",
+      "subType": "none",
+      "amount": "+ $13.00",
+      "date": "2026-07-02T02:18:50",
+      "audience": "friends",
+      "note": {"content": "Uberrrr 🚗"},
+      "title": {
+        "titleType": "story",
+        "payload": {"action": "pay", "subType": "p2p"},
+        "sender": {"id": "3333333333333333333", "displayName": "Sam Kelly", "username": "samk", "type": ""},
+        "receiver": {"id": "1111111111111111111", "displayName": "you", "username": "alexm521", "type": ""}
+      }
+    },
+    {
+      "id": "4631000000000000000",
+      "paymentId": "4631000000000000001",
+      "type": "payment",
+      "subType": "none",
+      "amount": "+ $1,240.00",
+      "date": "2026-06-30T14:00:00",
+      "audience": "private",
+      "note": {"content": "rent split"},
+      "title": {
+        "titleType": "story",
+        "payload": {"action": "charge", "subType": "p2p"},
+        "sender": {"id": "2222222222222222222", "displayName": "Jordan Rivera", "username": "jordanr", "type": ""},
+        "receiver": {"id": "1111111111111111111", "displayName": "you", "username": "alexm521", "type": ""}
+      }
+    },
+    {
+      "id": "4630000000000000000",
+      "type": "transfer",
+      "subType": "standard",
+      "amount": "$13.00",
+      "date": "2026-07-02T02:26:40",
+      "audience": "private",
+      "note": {"type": "standardTransferNote", "date": "7/7/2026", "name": "TIAA BANK", "lastFour": "0172"},
+      "title": {"titleType": "story", "payload": {"subType": "standardTransfer"}}
+    }
+  ]
+}

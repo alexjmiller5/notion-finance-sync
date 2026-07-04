@@ -1,41 +1,43 @@
-"""Venmo scraper — Venmo **mobile API** (api.venmo.com/v1), NOT the web.
+"""Venmo scraper — Venmo **web API** (account.venmo.com/api/stories), cookie-authed.
 
-Why the mobile API: the Venmo *web* login (id.venmo.com) is behind DataDome, which
-gates the auth POST behind a captcha that defeats unattended automation. The mobile
-app API is a plain JSON API on a different host with no DataDome. One SMS-OTP login
-yields a **long-lived access token** (never expires until logout); with the token +
-device-id persisted, daily syncs are pure ``httpx`` — no browser. See
-``data/snapshots/venmo/FINDINGS.md`` for the full recon.
+Why this and not the mobile API / web login form:
+- The mobile app API (api.venmo.com) gives a long-lived token, but its password grant
+  is blocked by a 240 security lock and can't be minted headless.
+- The web login form (id.venmo.com) is behind DataDome (captcha on the auth POST).
+
+The web *API* (`account.venmo.com/api/stories`) is cookie-authed and works from plain
+``httpx`` once you have a logged-in session's cookies — DataDome does NOT block the
+authenticated JSON GET. Cookies are captured once via ``scripts/venmo_web_capture.py``
+(auto-fills creds, auto-reads the SMS 2FA from Messages, ticks "remember this device",
+saves cookies + the user's external id). The daily sync then just replays those cookies.
+Re-run the capture when the session expires. See ``data/snapshots/venmo/FINDINGS.md``.
 
 Field mapping (SPEC §17):
-- ``name``     "Sent to {person}" / "Received from {person}" (from direction)
+- ``name``     "Sent to {person}" / "Received from {person}" (from the signed amount)
 - ``payee``    counterparty display name
-- ``memo``     Venmo note (incl. emojis)
-- ``amount``   signed: negative = sent, positive = received
-- ``category`` **None** — Venmo doesn't categorize; SPEC §11 → these land as Needs
-               Review for Alex to categorize / link via Related Transactions.
-- ``transacted_at`` the real UTC timestamp (Venmo exposes it) — used to derive the
-               Eastern ``transaction_date``; model-only, never written to Notion.
+- ``memo``     Venmo note (``note.content``)
+- ``amount``   signed: the web ``amount`` is a display string ("- $7.61" / "+ $13.00")
+- ``category`` **None** — Venmo doesn't categorize; SPEC §11 → Needs Review
+- ``transacted_at`` the real UTC timestamp (``date``) → derives the Eastern
+               ``transaction_date``; model-only, never written to Notion
 - ``bank`` Venmo · ``account_type`` P2P · ``credit_card_account`` "Venmo Account".
 
-The pure ``parse_stories`` half is offline/TDD-tested; only ``_login`` / ``_fetch_*``
-do I/O. Login identifier must be an **email/phone** (the mobile OAuth rejects the
-username); read from ``VENMO_LOGIN_EMAIL`` env or ``GMAIL_ADDRESS`` (both .env,
-gitignored — keeps the personal email out of git).
+Only ``type == "payment"`` stories are records (P2P sends/receives). ``transfer``
+stories are Venmo↔bank cash-outs (own-money moves the bank side already records) and
+are skipped. The pure ``parse_stories`` half is offline/TDD-tested.
 """
 
 from __future__ import annotations
 
-import os
+import json
+import re
 from datetime import UTC, date, datetime
 from pathlib import Path
-from random import randint
 from zoneinfo import ZoneInfo
 
 import httpx
 import structlog
 
-from notion_finance_sync.config.settings import get_bank_password, get_gmail_address
 from notion_finance_sync.models import (
     AccountType,
     BankName,
@@ -43,24 +45,32 @@ from notion_finance_sync.models import (
     TransactionRecord,
     TransactionStatus,
 )
-from notion_finance_sync.twofa.sms import get_sms_code
 
 logger = structlog.get_logger()
 
-BASE_URL = "https://api.venmo.com/v1"
-USER_AGENT = "Venmo/7.44.0 (iPhone; iOS 13.0; Scale/2.0)"
+ORIGIN = "https://account.venmo.com"
 EASTERN = ZoneInfo("America/New_York")
 NOTION_ACCOUNT = "Venmo Account"  # curated Notion "Credit Card / Account" select value
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+)
 
 _SESSION_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions" / "venmo"
-_DEVICE_FILE = _SESSION_DIR / "device_id.txt"
-_TOKEN_FILE = _SESSION_DIR / "access_token.txt"
+_COOKIES_FILE = _SESSION_DIR / "cookies.json"
+_EXTID_FILE = _SESSION_DIR / "external_id.txt"
 
-# Venmo OTP SMS: sender short-code + code regex still need one live confirmation
-# (never reached the OTP step during recon — the account was under a 240 lock). The
-# broad pattern below matches "Venmo ... 123456" / "code 123456"; tighten once seen.
-_SMS_SENDER = "%"
-_SMS_REGEX = r"(?i)venmo\D{0,80}?(\d{6})|code\D{0,10}?(\d{6})"
+_AMOUNT_RE = re.compile(r"([\d,]+\.?\d*)")
+
+
+def _parse_amount(s: str | None) -> float:
+    """Parse Venmo's display amount ("- $7.61" / "+ $13.00" / "$13.00") to a float."""
+    s = (s or "").strip()
+    m = _AMOUNT_RE.search(s)
+    if not m:
+        return 0.0
+    value = float(m.group(1).replace(",", ""))
+    return -value if s.lstrip().startswith("-") else value
 
 
 def _parse_ts(s: str | None) -> datetime | None:
@@ -70,45 +80,30 @@ def _parse_ts(s: str | None) -> datetime | None:
     return datetime.fromisoformat(s).replace(tzinfo=UTC)
 
 
-def _status(value: str | None) -> TransactionStatus:
-    if (value or "").lower() == "settled":
-        return TransactionStatus.POSTED
-    return TransactionStatus.PENDING
-
-
 def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
-    """Parse a ``/stories/target-or-actor/{id}`` response into TransactionRecords.
+    """Parse an ``/api/stories?feedType=me`` response into TransactionRecords.
 
-    Only ``type == "payment"`` stories become records (refunds / bank transfers /
-    top-ups are skipped). Sign is derived from action + whether I'm the actor:
-    ``pay`` moves money actor→target; ``charge`` moves money target→actor (when
-    settled). Positive = money in, negative = money out. ``amount`` in the payload
-    is a magnitude; we apply the sign.
+    Only ``type == "payment"`` stories become records. Direction comes from the signed
+    ``amount`` string (negative = I sent, positive = I received); the counterparty is
+    the receiver when I sent, else the sender. Works for both ``pay`` and settled
+    ``charge`` stories (the amount sign already encodes which way the money moved).
     """
     me = str(my_user_id)
     records: list[TransactionRecord] = []
-    for story in raw.get("data", []):
+    for story in raw.get("stories") or raw.get("data") or []:
         if story.get("type") != "payment":
             continue
-        pay = story.get("payment") or {}
-        actor = pay.get("actor") or {}
-        target = (pay.get("target") or {}).get("user") or {}
-        i_am_actor = str(actor.get("id")) == me
-        action = pay.get("action")
+        amount = _parse_amount(story.get("amount"))
+        i_sent = amount < 0
 
-        # pay: money leaves the actor. charge: money leaves the target (settled).
-        outflow = i_am_actor if action == "pay" else (not i_am_actor)
-        mag = abs(float(pay.get("amount") or 0.0))
-        amount = -mag if outflow else mag
+        title = story.get("title") or {}
+        counterparty = (title.get("receiver") if i_sent else title.get("sender")) or {}
+        cp_name = counterparty.get("displayName") or counterparty.get("username") or ""
+        name = f"Sent to {cp_name}" if i_sent else f"Received from {cp_name}"
 
-        counterparty = target if i_am_actor else actor
-        cp_name = (counterparty.get("display_name") or "").strip() or counterparty.get(
-            "username", ""
-        )
-        name = f"Sent to {cp_name}" if outflow else f"Received from {cp_name}"
-
-        note = (pay.get("note") or story.get("note") or "").strip()
-        ts = _parse_ts(story.get("date_created"))
+        note = story.get("note")
+        memo = note.get("content", "") if isinstance(note, dict) else (note or "")
+        ts = _parse_ts(story.get("date"))
         txn_date = ts.astimezone(EASTERN).date() if ts else date.today()
 
         records.append(
@@ -119,9 +114,9 @@ def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
                 amount=amount,
                 transaction_date=txn_date,
                 transacted_at=ts,
-                status=_status(pay.get("status")),
+                status=TransactionStatus.POSTED,
                 payee=cp_name,
-                memo=note,
+                memo=memo,
                 category=None,  # Venmo doesn't categorize -> Needs Review (SPEC §11)
                 bank=BankName.VENMO,
                 account_type=AccountType.P2P,
@@ -134,119 +129,69 @@ def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
 
 
 # ---------------------------------------------------------------------------
-# I/O half: login (SMS 2FA) + token/device persistence + paginated fetch
+# I/O half: replay the captured web session cookies (no browser at sync time)
 # ---------------------------------------------------------------------------
-def _login_email() -> str:
-    return os.environ.get("VENMO_LOGIN_EMAIL") or get_gmail_address()
+def _load_cookies() -> dict[str, str]:
+    if not _COOKIES_FILE.exists():
+        raise RuntimeError(
+            "No Venmo web-session cookies. Run `scripts/venmo_web_capture.py` to log in "
+            "and capture them (auto-reads the SMS 2FA)."
+        )
+    return json.loads(_COOKIES_FILE.read_text())
 
 
-def _random_device_id() -> str:
-    base = "88884260-05O3-8U81-58I1-2WA76F357GR9"
-    return "".join(str(randint(0, 9)) if c.isdigit() else c for c in base)
+def _external_id() -> str:
+    if _EXTID_FILE.exists() and _EXTID_FILE.read_text().strip():
+        return _EXTID_FILE.read_text().strip()
+    raise RuntimeError("No Venmo external_id saved. Re-run scripts/venmo_web_capture.py.")
 
 
-def _device_id() -> str:
-    if _DEVICE_FILE.exists():
-        return _DEVICE_FILE.read_text().strip()
-    _SESSION_DIR.mkdir(parents=True, exist_ok=True)
-    did = _random_device_id()
-    _DEVICE_FILE.write_text(did)
-    return did
-
-
-def _login(client: httpx.Client, device_id: str) -> str:
-    """Full password + SMS-OTP login, returning a (long-lived) access token."""
-    email, password = _login_email(), get_bank_password("venmo")
-    r = client.post(
-        "/oauth/access_token",
-        headers={"device-id": device_id, "Content-Type": "application/json"},
-        json={"phone_email_or_username": email, "client_id": "1", "password": password},
-    )
-    body = r.json()
-    if not body.get("error"):
-        return body["access_token"]
-
-    otp_secret = r.headers.get("venmo-otp-secret")
-    if not otp_secret:
-        raise RuntimeError(f"Venmo login failed (no otp-secret): {body.get('error')}")
-    requested_at = datetime.now(tz=UTC)
-    client.post(
-        "/account/two-factor/token",
+def _client() -> httpx.Client:
+    cookies = _load_cookies()
+    csrf = cookies.get("_csrf", "")
+    return httpx.Client(
+        base_url=ORIGIN,
+        cookies=cookies,
         headers={
-            "device-id": device_id,
-            "Content-Type": "application/json",
-            "venmo-otp-secret": otp_secret,
+            "User-Agent": _UA,
+            "Accept": "application/json",
+            "Referer": ORIGIN + "/",
+            "csrf-token": csrf,
+            "xsrf-token": csrf,
         },
-        json={"via": "sms"},
-    )
-    code = get_sms_code(
-        after=requested_at, sender_pattern=_SMS_SENDER, code_regex=_SMS_REGEX, timeout_s=150
-    )
-    if not code:
-        raise RuntimeError("Venmo OTP not received within timeout")
-    r3 = client.post(
-        "/oauth/access_token",
-        params={"client_id": 1},
-        headers={"device-id": device_id, "venmo-otp": code, "venmo-otp-secret": otp_secret},
-    )
-    token = r3.json()["access_token"]
-    try:
-        client.post("/users/devices", headers={"device-id": device_id})  # trust device
-    except Exception as exc:  # noqa: BLE001 — non-fatal
-        logger.warning("venmo_trust_device_failed", error=str(exc))
-    return token
-
-
-def _authed_client() -> httpx.Client:
-    """httpx client carrying a valid bearer token (reused if saved, else login)."""
-    device_id = _device_id()
-    client = httpx.Client(
-        base_url=BASE_URL,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        follow_redirects=False,
         timeout=30,
     )
-    token = _TOKEN_FILE.read_text().strip() if _TOKEN_FILE.exists() else None
-    if not token:
-        token = _login(client, device_id)
-        _SESSION_DIR.mkdir(parents=True, exist_ok=True)
-        _TOKEN_FILE.write_text(token)
-        logger.info("venmo_login_ok")
-    client.headers["Authorization"] = (
-        token if token.lower().startswith("bearer") else f"Bearer {token}"
-    )
-    return client
 
 
-def _my_user_id(client: httpx.Client) -> str:
-    body = client.get("/account").json()
-    user = (body.get("data") or {}).get("user") or body.get("user") or {}
-    uid = user.get("id")
-    if not uid:
-        raise RuntimeError("Could not resolve Venmo user id from /account")
-    return str(uid)
-
-
-def _fetch_stories(client: httpx.Client, my_id: str, since: date, *, max_pages: int = 60) -> dict:
-    """Page ``/stories/target-or-actor/{id}`` back until older than ``since``.
-
-    Returns a synthesized ``{"data": [...]}`` of every story fetched (parser filters).
-    """
+def _fetch_stories(client: httpx.Client, ext_id: str, since: date, *, max_pages: int = 60) -> dict:
+    """Page ``/api/stories`` (nextId cursor) back until older than ``since``."""
     all_stories: list[dict] = []
-    before_id: str | None = None
+    next_id: str | None = None
     for _ in range(max_pages):
-        params = {"limit": 50}
-        if before_id:
-            params["before_id"] = before_id
-        page = client.get(f"/stories/target-or-actor/{my_id}", params=params).json()
-        stories = page.get("data") or []
+        params = {"feedType": "me", "externalId": ext_id}
+        if next_id:
+            params["nextId"] = next_id
+        resp = client.get("/api/stories", params=params)
+        if resp.status_code in (301, 302, 401, 403) or "json" not in resp.headers.get(
+            "content-type", ""
+        ):
+            raise RuntimeError(
+                f"Venmo web session invalid (HTTP {resp.status_code}). Re-run "
+                "scripts/venmo_web_capture.py to refresh cookies."
+            )
+        body = resp.json()
+        stories = body.get("stories") or []
         if not stories:
             break
         all_stories.extend(stories)
-        oldest = _parse_ts(stories[-1].get("date_created"))
+        oldest = _parse_ts(stories[-1].get("date"))
         if oldest and oldest.astimezone(EASTERN).date() < since:
             break
-        before_id = stories[-1].get("id")
-    return {"data": all_stories}
+        next_id = body.get("nextId")
+        if not next_id:
+            break
+    return {"stories": all_stories}
 
 
 class VenmoScraper:
@@ -256,11 +201,11 @@ class VenmoScraper:
     CATEGORY_MAP: CategoryMap = {}  # Venmo has no bank categories
 
     def fetch_recent(self, since: date) -> list[TransactionRecord]:
-        client = _authed_client()
+        client = _client()
         try:
-            my_id = _my_user_id(client)
-            raw = _fetch_stories(client, my_id, since)
-            recs = parse_stories(raw, my_user_id=my_id)
+            ext_id = _external_id()
+            raw = _fetch_stories(client, ext_id, since)
+            recs = parse_stories(raw, my_user_id=ext_id)
             recs = [r for r in recs if r.transaction_date and r.transaction_date >= since]
             logger.info("venmo_fetched", count=len(recs), since=since.isoformat())
             return recs
@@ -268,11 +213,11 @@ class VenmoScraper:
             client.close()
 
     def fetch_historical(self, start: date, end: date) -> list[TransactionRecord]:
-        client = _authed_client()
+        client = _client()
         try:
-            my_id = _my_user_id(client)
-            raw = _fetch_stories(client, my_id, start)
-            recs = parse_stories(raw, my_user_id=my_id)
+            ext_id = _external_id()
+            raw = _fetch_stories(client, ext_id, start)
+            recs = parse_stories(raw, my_user_id=ext_id)
             recs = [r for r in recs if r.transaction_date and start <= r.transaction_date <= end]
             logger.info("venmo_historical", count=len(recs))
             return recs
