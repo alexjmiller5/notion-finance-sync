@@ -119,7 +119,7 @@ class NotionClient:
         return {
             "page_id": page_id,
             "name": title[0]["plain_text"] if title else "",
-            "amount": number("Transaction Amount"),
+            "amount": number("Txn Amount"),
             # Key matches TransactionRecord.transaction_date so sync.diffing's
             # MATERIAL_FIELDS comparison lines up.
             "transaction_date": date_start("Transaction Date"),
@@ -139,9 +139,9 @@ class NotionClient:
             "true_rewards": number("True Rewards"),
             "bilt_points": number("Bilt Points"),
             "bilt_partner": checkbox("Bilt Partner"),
-            "quantity": number("Quantity"),
+            "quantity": number("Qty"),
             "ticker": text("Ticker"),
-            "price_per_share": number("Price Per Share"),
+            "price_per_share": number("PPS"),
         }
 
     async def create_transaction(self, properties: dict[str, Any]) -> None:

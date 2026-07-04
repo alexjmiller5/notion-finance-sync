@@ -36,7 +36,7 @@ def test_card_record_encodes_to_expected_notion_properties(card_first_record):
     props = encode_transaction(card_first_record)
 
     assert props["Name"]["title"][0]["text"]["content"].startswith("PARADISE MARKET")
-    assert props["Transaction Amount"]["number"] == -4.78
+    assert props["Txn Amount"]["number"] == -4.78
     assert props["Transaction Date"]["date"]["start"] == "2026-06-24"  # detail's true date
     assert props["Bank"]["select"]["name"] == "Bank of America"
     assert props["Account Type"]["select"]["name"] == "Credit Card"
@@ -56,7 +56,7 @@ def test_deposit_zelle_record_encodes_as_transfer():
     rec = deposit.parse_activity(raw, account_name="Adv Plus Banking - 2093")[0]
     props = encode_transaction(rec)
 
-    assert props["Transaction Amount"]["number"] == -50.0
+    assert props["Txn Amount"]["number"] == -50.0
     assert props["Bank"]["select"]["name"] == "Bank of America"
     assert props["Account Type"]["select"]["name"] == "Checking"
     assert props["Category"]["select"]["name"] == "Transfer"  # Zelle auto-Transfer

@@ -58,12 +58,42 @@ def _account_for(switcher_text: str) -> _Account | None:
     return None
 
 
-def _set_period(sb, period: str) -> str:
-    """Set the Activity date-range <select> via a NATIVE selection.
+def _confirm_retrieval(sb) -> bool:
+    """Click 'Yes, continue data retrieval' on the long-retrieval alert if shown.
 
-    The select's ``onchange="ProcessDropdownChange()"`` (defined in external JS)
-    does the postback; a JS ``value=...`` shim doesn't trigger it, so use
-    SeleniumBase's native select which fires the real change event.
+    A large date range triggers an in-page "Activity Data Retrieval Alert"
+    ("Data retrieval may take longer than expected. Would you like to continue?")
+    — without confirming, the grid returns only the default window.
+    """
+    return bool(
+        sb.cdp.evaluate(
+            "(() => {"
+            "  for (const el of document.querySelectorAll('a,button,input')) {"
+            "    const t = (el.innerText || el.value || '').toLowerCase();"
+            "    if (t.includes('continue data retrieval')"
+            "        || (t.includes('yes') && t.includes('continue'))) {"
+            "      el.click(); return true; } }"
+            "  return false; })()"
+        )
+    )
+
+
+def _wait_confirm_retrieval(sb, tries: int = 8) -> bool:
+    """Poll for the retrieval-alert (it appears a beat after Apply/paging)."""
+    for _ in range(tries):
+        if _confirm_retrieval(sb):
+            sb.cdp.sleep(12)  # long retrieval after confirming
+            return True
+        sb.cdp.sleep(3)
+    return False
+
+
+def _set_period(sb, period: str) -> str:
+    """Select the date range AND click Apply (staging the option isn't enough).
+
+    Picking an option in the date <select> only stages the date inputs; the grid
+    re-queries only when the "Apply" button (``ApplyActivityFilter()``) is
+    clicked. Returns the applied ``period start..end`` for validation/logging.
     """
     try:
         sb.cdp.select_option_by_value(_PERIOD_SELECT, _PERIOD_VALUE[period])
@@ -72,14 +102,52 @@ def _set_period(sb, period: str) -> str:
             sb.cdp.select_option_by_text(_PERIOD_SELECT, _PERIOD_TEXT[period])
         except Exception:  # noqa: BLE001
             pass
-    sb.cdp.sleep(16)  # ProcessDropdownChange postback + grid reload
-    # Report the option the server actually rendered as selected (the hardcoded
-    # label lied before — this reflects whether the postback really applied).
-    actual = sb.cdp.evaluate(
-        "(() => { const s = document.querySelector(\"select[id*='dateControlSelectDates']\");"
-        " return s && s.selectedIndex >= 0 ? s.options[s.selectedIndex].text : 'NO-SELECT'; })()"
+    sb.cdp.sleep(3)
+    sb.cdp.evaluate(
+        "(() => { if (typeof ApplyActivityFilter === 'function') { ApplyActivityFilter(); return; }"
+        "  const b = document.querySelector('#btnASApply'); if (b) b.click(); })()"
     )
-    return actual if isinstance(actual, str) else str(actual)
+    sb.cdp.sleep(4)
+    _wait_confirm_retrieval(sb)  # confirm the "may take longer" alert if it appears
+    sb.cdp.sleep(14)  # filter apply postback + grid reload
+    # Read back the applied range so the log proves whether it actually widened.
+    info = sb.cdp.evaluate(
+        "(() => {"
+        "  const p = document.querySelector(\"select[id*='dateControlSelectDates']\");"
+        "  const s = document.querySelector('#dateFilterStartDate');"
+        "  const e = document.querySelector('#dateFilterEndDate');"
+        "  const period = p && p.selectedIndex >= 0 ? p.options[p.selectedIndex].text : '?';"
+        "  return period + ' ' + (s ? s.value : '?') + '..' + (e ? e.value : '?'); })()"
+    )
+    return info if isinstance(info, str) else str(info)
+
+
+def _parse_all_pages(sb, *, account_name, source_account_id, account_type):
+    """Parse the activity grid across all result pages (dedup by source_id)."""
+    out: list[TransactionRecord] = []
+    seen: set[str] = set()
+    for _ in range(40):  # safety cap
+        html = sb.cdp.evaluate("document.documentElement.outerHTML") or ""
+        for r in investments.parse_activity(
+            html,
+            account_name=account_name,
+            source_account_id=source_account_id,
+            account_type=account_type,
+        ):
+            if r.source_id not in seen:
+                seen.add(r.source_id)
+                out.append(r)
+        advanced = sb.cdp.evaluate(
+            "(() => { const n = document.querySelector('#PaginationCtrlBottom_next')"
+            " || document.querySelector('#PaginationCtrlTop_next');"
+            "  if (n && !n.classList.contains('disabled')) { n.click(); return true; }"
+            "  return false; })()"
+        )
+        if not advanced:
+            break
+        sb.cdp.sleep(6)
+        _confirm_retrieval(sb)  # paging a large range can re-trigger the alert
+    return out
 
 
 class BofAInvestmentsScraper:
@@ -122,10 +190,9 @@ class BofAInvestmentsScraper:
                     seen.add(acct.source_account_id)
                     sb.cdp.open(_PB + "/TFPActivity/" + link["href"])  # as_cd switches account
                     sb.cdp.sleep(6)
-                    picked = _set_period(sb, period)
-                    html = sb.cdp.evaluate("document.documentElement.outerHTML") or ""
-                    recs = investments.parse_activity(
-                        html,
+                    applied = _set_period(sb, period)
+                    recs = _parse_all_pages(
+                        sb,
                         account_name=acct.account_name,
                         source_account_id=acct.source_account_id,
                         account_type=acct.account_type,
@@ -135,7 +202,7 @@ class BofAInvestmentsScraper:
                     logger.info(
                         "bofa_inv_scraped",
                         account=acct.notion_label,
-                        period=picked,
+                        applied=applied,
                         count=len(recs),
                     )
                     records.extend(recs)
