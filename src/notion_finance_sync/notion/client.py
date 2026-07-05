@@ -19,6 +19,7 @@ from notion_finance_sync.config.settings import NOTION_API_VERSION
 from notion_finance_sync.models.transactions import TransactionRecord
 from notion_finance_sync.notion.encoders import encode_transaction
 from notion_finance_sync.notion.http import request_with_retry
+from notion_finance_sync.notion.properties import P
 
 logger = structlog.get_logger()
 
@@ -58,10 +59,11 @@ class NotionClient:
 
         filter_body: dict[str, Any] = {}
         if since_date:
+            # Filter by property ID (rename-proof); Notion accepts id or name here.
             filter_body["filter"] = {
                 "or": [
-                    {"property": "Transaction Date", "date": {"on_or_after": since_date}},
-                    {"property": "Transaction Date", "date": {"is_empty": True}},
+                    {"property": P.DATE, "date": {"on_or_after": since_date}},
+                    {"property": P.DATE, "date": {"is_empty": True}},
                 ]
             }
 
@@ -79,7 +81,11 @@ class NotionClient:
 
             for page in data["results"]:
                 props = page["properties"]
-                rich_text = props.get("Transaction Source ID", {}).get("rich_text", [])
+                # Read the source id by its stable property id (rename-proof).
+                src_prop = next(
+                    (v for v in props.values() if v.get("id") == P.SOURCE_ID), {}
+                )
+                rich_text = src_prop.get("rich_text", [])
                 if not rich_text:
                     continue
 
@@ -95,57 +101,62 @@ class NotionClient:
 
     @staticmethod
     def _row_from_props(page_id: str, props: dict[str, Any]) -> dict[str, Any]:
-        """Decode Notion property dict into a flat row representation."""
+        """Decode a Notion page's properties into a flat row representation.
 
-        def text(name: str) -> str:
-            rt = props.get(name, {}).get("rich_text", [])
+        Page ``properties`` are keyed by display NAME but each value carries its
+        stable ``id``; read by id so renames never break the decode.
+        """
+        by_id = {v.get("id"): v for v in props.values()}
+
+        def text(pid: str) -> str:
+            rt = by_id.get(pid, {}).get("rich_text", [])
             return rt[0]["plain_text"] if rt else ""
 
-        def number(name: str) -> float | None:
-            return props.get(name, {}).get("number")
+        def number(pid: str) -> float | None:
+            return by_id.get(pid, {}).get("number")
 
-        def select(name: str) -> str:
-            sel = props.get(name, {}).get("select")
+        def select(pid: str) -> str:
+            sel = by_id.get(pid, {}).get("select")
             return sel["name"] if sel else ""
 
-        def date_start(name: str) -> str | None:
-            d = props.get(name, {}).get("date")
+        def date_start(pid: str) -> str | None:
+            d = by_id.get(pid, {}).get("date")
             return d["start"] if d else None
 
-        def status(name: str) -> str:
-            s = props.get(name, {}).get("status", {})
+        def status(pid: str) -> str:
+            s = by_id.get(pid, {}).get("status", {})
             return s.get("name", "")
 
-        def checkbox(name: str) -> bool:
-            return bool(props.get(name, {}).get("checkbox", False))
+        def checkbox(pid: str) -> bool:
+            return bool(by_id.get(pid, {}).get("checkbox", False))
 
-        title = props.get("Name", {}).get("title", [])
+        title = by_id.get(P.NAME, {}).get("title", [])
         return {
             "page_id": page_id,
             "name": title[0]["plain_text"] if title else "",
-            "amount": number("Txn Amount"),
+            "amount": number(P.AMOUNT),
             # Key matches TransactionRecord.transaction_date so sync.diffing's
             # MATERIAL_FIELDS comparison lines up.
-            "transaction_date": date_start("Transaction Date"),
-            "status": status("Transaction Status"),
-            "payee": text("Payee"),
-            "memo": text("Memo"),
-            "bank": select("Bank"),
-            "credit_card_account": select("Credit Card / Account"),
-            "card_network": select("Card Network"),
-            "account_type": select("Account Type"),
-            "account_name": text("Account Name"),
-            "bank_category": text("Bank Category"),
-            "category": select("Category"),
-            "source_id": text("Transaction Source ID"),
-            "source_account_id": text("Source Account ID"),
-            "calculated_rewards": number("Calculated Rewards"),
-            "true_rewards": number("True Rewards"),
-            "bilt_points": number("Bilt Points"),
-            "bilt_partner": checkbox("Bilt Partner"),
-            "quantity": number("Qty"),
-            "ticker": text("Ticker"),
-            "price_per_share": number("PPS"),
+            "transaction_date": date_start(P.DATE),
+            "status": status(P.STATUS),
+            "payee": text(P.PAYEE),
+            "memo": text(P.MEMO),
+            "bank": select(P.BANK),
+            "credit_card_account": select(P.CREDIT_CARD_ACCOUNT),
+            "card_network": select(P.CARD_NETWORK),
+            "account_type": select(P.ACCOUNT_TYPE),
+            "account_name": text(P.ACCOUNT_NAME),
+            "bank_category": text(P.BANK_CATEGORY),
+            "category": select(P.CATEGORY),
+            "source_id": text(P.SOURCE_ID),
+            "source_account_id": text(P.SOURCE_ACCOUNT_ID),
+            "calculated_rewards": number(P.CALCULATED_REWARDS),
+            "true_rewards": number(P.TRUE_REWARDS),
+            "bilt_points": number(P.BILT_POINTS),
+            "bilt_partner": checkbox(P.BILT_PARTNER),
+            "quantity": number(P.QUANTITY),
+            "ticker": select(P.TICKER),
+            "price_per_share": number(P.PRICE_PER_SHARE),
         }
 
     async def create_transaction(self, properties: dict[str, Any]) -> None:
@@ -185,8 +196,8 @@ class NotionClient:
     ) -> None:
         """Flip a Pending page to Released with a release date."""
         properties = {
-            "Transaction Status": {"status": {"name": "Released"}},
-            "Release Date": {"date": {"start": release_date}},
+            P.STATUS: {"status": {"name": "Released"}},
+            P.RELEASE_DATE: {"date": {"start": release_date}},
         }
         await self.update_transaction(page_id, properties)
         logger.info("released_page", page_id=page_id, release_date=release_date)

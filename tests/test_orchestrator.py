@@ -30,6 +30,7 @@ from notion_finance_sync.models import (
     TransactionRecord,
     TransactionStatus,
 )
+from notion_finance_sync.notion.properties import P
 from tests.fakes import FakeBankScraper, FakeEnricher
 
 TEST_API_KEY = "secret_test"
@@ -113,22 +114,32 @@ def _existing_row(
     status: str = "Posted",
     transaction_date: str = "2026-05-01",
 ) -> dict:
-    """Shape a Notion page-response row matching what NotionClient expects."""
+    """Shape a Notion page-response row matching what NotionClient expects.
+
+    Real page responses key properties by display NAME but carry each property's
+    stable ``id`` — the client reads by id, so include ids here.
+    """
     return {
         "id": page_id,
         "properties": {
-            "Name": {"title": [{"plain_text": name}]},
-            "Txn Amount": {"number": amount},
-            "Transaction Date": {"date": {"start": transaction_date}},
-            "Transaction Status": {"status": {"name": status}},
-            "Transaction Source ID": {"rich_text": [{"plain_text": source_id}]},
-            "Source Account ID": {"rich_text": [{"plain_text": "acct-fake-1"}]},
-            "Payee": {"rich_text": [{"plain_text": name}]},
-            "Bank": {"select": {"name": "Bank of America"}},
-            "Credit Card / Account": {"select": {"name": "AQHA Customized Cash Rewards"}},
-            "Card Network": {"select": {"name": "Visa"}},
-            "Account Type": {"select": {"name": "Credit Card"}},
-            "Account Name": {"rich_text": [{"plain_text": "AQHA"}]},
+            "Name": {"id": P.NAME, "title": [{"plain_text": name}]},
+            "Txn Amount": {"id": P.AMOUNT, "number": amount},
+            "Transaction Date": {"id": P.DATE, "date": {"start": transaction_date}},
+            "Transaction Status": {"id": P.STATUS, "status": {"name": status}},
+            "Transaction Source ID": {"id": P.SOURCE_ID, "rich_text": [{"plain_text": source_id}]},
+            "Source Account ID": {
+                "id": P.SOURCE_ACCOUNT_ID,
+                "rich_text": [{"plain_text": "acct-fake-1"}],
+            },
+            "Payee": {"id": P.PAYEE, "rich_text": [{"plain_text": name}]},
+            "Bank": {"id": P.BANK, "select": {"name": "Bank of America"}},
+            "Credit Card / Account": {
+                "id": P.CREDIT_CARD_ACCOUNT,
+                "select": {"name": "AQHA Customized Cash Rewards"},
+            },
+            "Card Network": {"id": P.CARD_NETWORK, "select": {"name": "Visa"}},
+            "Account Type": {"id": P.ACCOUNT_TYPE, "select": {"name": "Credit Card"}},
+            "Account Name": {"id": P.ACCOUNT_NAME, "rich_text": [{"plain_text": "AQHA"}]},
         },
     }
 
@@ -323,8 +334,8 @@ class TestOrphanRelease:
         assert result.pending_released == 1
         assert release_route.call_count == 1
         body = json.loads(release_route.calls[0].request.content)
-        assert body["properties"]["Transaction Status"] == {"status": {"name": "Released"}}
-        assert "Release Date" in body["properties"]
+        assert body["properties"][P.STATUS] == {"status": {"name": "Released"}}
+        assert P.RELEASE_DATE in body["properties"]
 
     @pytest.mark.asyncio
     async def test_does_not_release_other_accounts_pending_rows(self, respx_mock, monkeypatch):
@@ -349,7 +360,8 @@ class TestOrphanRelease:
             status="Pending",
         )
         other_bank_pending["properties"]["Source Account ID"] = {
-            "rich_text": [{"plain_text": "acct-OTHER-bank"}]
+            "id": P.SOURCE_ACCOUNT_ID,
+            "rich_text": [{"plain_text": "acct-OTHER-bank"}],
         }
         respx_mock.post(QUERY_URL).mock(
             return_value=httpx.Response(200, json=_query_response([other_bank_pending]))
@@ -470,6 +482,7 @@ class TestRetryAndEscalation:
 
         assert task_create_route.called
         body = json.loads(task_create_route.calls[0].request.content)
+        # Tasks DB (separate from Transactions — not part of the property-ID refactor).
         title = body["properties"]["Name"]["title"][0]["text"]["content"]
         assert title.startswith("Fix Fake Bank scraper")
 

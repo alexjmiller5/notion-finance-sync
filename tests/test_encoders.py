@@ -29,6 +29,7 @@ from notion_finance_sync.models.transactions import (
 )
 from notion_finance_sync.notion.client import NotionClient
 from notion_finance_sync.notion.encoders import encode_transaction
+from notion_finance_sync.notion.properties import P
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -105,79 +106,79 @@ class TestEncodeTransactionFullRecord:
         self.props = encode_transaction(self.record)
 
     def test_title_encoded(self):
-        assert self.props["Name"] == {"title": [{"text": {"content": "Starbucks"}}]}
+        assert self.props[P.NAME] == {"title": [{"text": {"content": "Starbucks"}}]}
 
     def test_amount_encoded(self):
-        assert self.props["Txn Amount"] == {"number": -5.75}
+        assert self.props[P.AMOUNT] == {"number": -5.75}
 
     def test_transaction_date_encoded(self):
-        assert self.props["Transaction Date"] == {"date": {"start": "2025-03-15"}}
+        assert self.props[P.DATE] == {"date": {"start": "2025-03-15"}}
 
     def test_status_encoded(self):
-        assert self.props["Transaction Status"] == {"status": {"name": "Posted"}}
+        assert self.props[P.STATUS] == {"status": {"name": "Posted"}}
 
     def test_payee_encoded(self):
-        assert self.props["Payee"] == {"rich_text": [{"text": {"content": "Starbucks Coffee"}}]}
+        assert self.props[P.PAYEE] == {"rich_text": [{"text": {"content": "Starbucks Coffee"}}]}
 
     def test_memo_encoded(self):
-        assert self.props["Memo"] == {"rich_text": [{"text": {"content": "Morning coffee"}}]}
+        assert self.props[P.MEMO] == {"rich_text": [{"text": {"content": "Morning coffee"}}]}
 
     def test_bank_category_encoded(self):
-        assert self.props["Bank Category"] == {"rich_text": [{"text": {"content": "Food & Drink"}}]}
+        assert self.props[P.BANK_CATEGORY] == {"rich_text": [{"text": {"content": "Food & Drink"}}]}
 
     def test_category_encoded(self):
-        assert self.props["Category"] == {"select": {"name": "Dining"}}
+        assert self.props[P.CATEGORY] == {"select": {"name": "Dining"}}
 
     def test_bank_encoded(self):
-        assert self.props["Bank"] == {"select": {"name": "Bilt"}}
+        assert self.props[P.BANK] == {"select": {"name": "Bilt"}}
 
     def test_credit_card_account_encoded(self):
-        assert self.props["Credit Card / Account"] == {"select": {"name": "Bilt Mastercard"}}
+        assert self.props[P.CREDIT_CARD_ACCOUNT] == {"select": {"name": "Bilt Mastercard"}}
 
     def test_card_network_encoded(self):
-        assert self.props["Card Network"] == {"select": {"name": "Mastercard"}}
+        assert self.props[P.CARD_NETWORK] == {"select": {"name": "Mastercard"}}
 
     def test_account_type_encoded(self):
-        assert self.props["Account Type"] == {"select": {"name": "Credit Card"}}
+        assert self.props[P.ACCOUNT_TYPE] == {"select": {"name": "Credit Card"}}
 
     def test_account_name_encoded(self):
-        assert self.props["Account Name"] == {
+        assert self.props[P.ACCOUNT_NAME] == {
             "rich_text": [{"text": {"content": "Bilt World Elite"}}]
         }
 
     def test_source_id_encoded(self):
-        assert self.props["Transaction Source ID"] == {
+        assert self.props[P.SOURCE_ID] == {
             "rich_text": [{"text": {"content": "src-001"}}]
         }
 
     def test_source_account_id_encoded(self):
-        assert self.props["Source Account ID"] == {"rich_text": [{"text": {"content": "acct-001"}}]}
+        assert self.props[P.SOURCE_ACCOUNT_ID] == {"rich_text": [{"text": {"content": "acct-001"}}]}
 
     def test_calculated_rewards_encoded(self):
-        assert self.props["Calculated Rewards"] == {"number": 0.1725}
+        assert self.props[P.CALCULATED_REWARDS] == {"number": 0.1725}
 
     def test_true_rewards_encoded(self):
-        assert self.props["True Rewards"] == {"number": 0.115}
+        assert self.props[P.TRUE_REWARDS] == {"number": 0.115}
 
     def test_rewards_type_encoded(self):
-        assert self.props["Rewards Type"] == {"select": {"name": "Cashback"}}
+        assert self.props[P.REWARDS_TYPE] == {"select": {"name": "Cashback"}}
 
     def test_bilt_points_encoded(self):
-        assert self.props["Bilt Points"] == {"number": 5.75}
+        assert self.props[P.BILT_POINTS] == {"number": 5.75}
 
     def test_bilt_partner_true_encoded(self):
-        assert self.props["Bilt Partner"] == {"checkbox": True}
+        assert self.props[P.BILT_PARTNER] == {"checkbox": True}
 
     def test_investment_fields_absent_when_none(self):
-        assert "Qty" not in self.props
-        assert "Ticker" not in self.props
-        assert "PPS" not in self.props
+        assert P.QUANTITY not in self.props
+        assert P.TICKER not in self.props
+        assert P.PRICE_PER_SHARE not in self.props
 
     def test_excluded_computed_fields_not_present(self):
-        assert "Related Transactions" not in self.props
-        assert "Related Transactions Amount" not in self.props
-        assert "Net Amount" not in self.props
-        assert "Release Date" not in self.props
+        assert P.RELATED_TRANSACTIONS not in self.props
+        assert P.RELATED_TRANSACTIONS_AMOUNT not in self.props
+        assert P.NET_AMOUNT not in self.props
+        assert P.RELEASE_DATE not in self.props
 
 
 # ---------------------------------------------------------------------------
@@ -191,61 +192,61 @@ class TestEncodeTransactionSparseRecord:
         self.props = encode_transaction(self.record)
 
     def test_required_fields_present(self):
-        assert "Name" in self.props
-        assert "Txn Amount" in self.props
-        assert "Transaction Date" in self.props
-        assert "Transaction Status" in self.props
-        assert "Transaction Source ID" in self.props
-        assert "Source Account ID" in self.props
+        assert P.NAME in self.props
+        assert P.AMOUNT in self.props
+        assert P.DATE in self.props
+        assert P.STATUS in self.props
+        assert P.SOURCE_ID in self.props
+        assert P.SOURCE_ACCOUNT_ID in self.props
 
     def test_payee_absent_when_empty_string(self):
-        assert "Payee" not in self.props
+        assert P.PAYEE not in self.props
 
     def test_memo_absent_when_empty_string(self):
-        assert "Memo" not in self.props
+        assert P.MEMO not in self.props
 
     def test_bank_category_absent_when_none(self):
-        assert "Bank Category" not in self.props
+        assert P.BANK_CATEGORY not in self.props
 
     def test_category_absent_when_none(self):
-        assert "Category" not in self.props
+        assert P.CATEGORY not in self.props
 
     def test_bank_absent_when_none(self):
-        assert "Bank" not in self.props
+        assert P.BANK not in self.props
 
     def test_credit_card_account_absent_when_none(self):
-        assert "Credit Card / Account" not in self.props
+        assert P.CREDIT_CARD_ACCOUNT not in self.props
 
     def test_card_network_absent_when_none(self):
-        assert "Card Network" not in self.props
+        assert P.CARD_NETWORK not in self.props
 
     def test_account_type_absent_when_none(self):
-        assert "Account Type" not in self.props
+        assert P.ACCOUNT_TYPE not in self.props
 
     def test_account_name_absent_when_empty_string(self):
-        assert "Account Name" not in self.props
+        assert P.ACCOUNT_NAME not in self.props
 
     def test_calculated_rewards_absent_when_none(self):
-        assert "Calculated Rewards" not in self.props
+        assert P.CALCULATED_REWARDS not in self.props
 
     def test_true_rewards_absent_when_none(self):
-        assert "True Rewards" not in self.props
+        assert P.TRUE_REWARDS not in self.props
 
     def test_bilt_points_absent_when_none(self):
-        assert "Bilt Points" not in self.props
+        assert P.BILT_POINTS not in self.props
 
     def test_bilt_partner_false_is_present(self):
-        assert "Bilt Partner" in self.props
-        assert self.props["Bilt Partner"] == {"checkbox": False}
+        assert P.BILT_PARTNER in self.props
+        assert self.props[P.BILT_PARTNER] == {"checkbox": False}
 
     def test_quantity_absent_when_none(self):
-        assert "Qty" not in self.props
+        assert P.QUANTITY not in self.props
 
     def test_ticker_absent_when_none(self):
-        assert "Ticker" not in self.props
+        assert P.TICKER not in self.props
 
     def test_price_per_share_absent_when_none(self):
-        assert "PPS" not in self.props
+        assert P.PRICE_PER_SHARE not in self.props
 
 
 # ---------------------------------------------------------------------------
@@ -258,37 +259,37 @@ class TestStrEnumEncoding:
         record = make_sparse_record()
         record.status = TransactionStatus.PENDING
         props = encode_transaction(record)
-        assert props["Transaction Status"] == {"status": {"name": "Pending"}}
+        assert props[P.STATUS] == {"status": {"name": "Pending"}}
 
     def test_status_released_encodes_by_value(self):
         record = make_sparse_record()
         record.status = TransactionStatus.RELEASED
         props = encode_transaction(record)
-        assert props["Transaction Status"] == {"status": {"name": "Released"}}
+        assert props[P.STATUS] == {"status": {"name": "Released"}}
 
     def test_bank_name_encodes_by_value(self):
         record = make_sparse_record()
         record.bank = BankName.WELLS_FARGO
         props = encode_transaction(record)
-        assert props["Bank"] == {"select": {"name": "Wells Fargo"}}
+        assert props[P.BANK] == {"select": {"name": "Wells Fargo"}}
 
     def test_card_network_visa_encodes_by_value(self):
         record = make_sparse_record()
         record.card_network = CardNetwork.VISA
         props = encode_transaction(record)
-        assert props["Card Network"] == {"select": {"name": "Visa"}}
+        assert props[P.CARD_NETWORK] == {"select": {"name": "Visa"}}
 
     def test_account_type_brokerage_encodes_by_value(self):
         record = make_sparse_record()
         record.account_type = AccountType.BROKERAGE
         props = encode_transaction(record)
-        assert props["Account Type"] == {"select": {"name": "Brokerage"}}
+        assert props[P.ACCOUNT_TYPE] == {"select": {"name": "Brokerage"}}
 
     def test_category_groceries_encodes_by_value(self):
         record = make_sparse_record()
         record.category = CanonicalCategory.GROCERIES
         props = encode_transaction(record)
-        assert props["Category"] == {"select": {"name": "Groceries"}}
+        assert props[P.CATEGORY] == {"select": {"name": "Groceries"}}
 
 
 # ---------------------------------------------------------------------------
@@ -302,25 +303,26 @@ class TestInvestmentRecord:
         self.props = encode_transaction(self.record)
 
     def test_quantity_encoded(self):
-        assert self.props["Qty"] == {"number": 3.5}
+        assert self.props[P.QUANTITY] == {"number": 3.5}
 
     def test_ticker_encoded(self):
-        assert self.props["Ticker"] == {"rich_text": [{"text": {"content": "TSLA"}}]}
+        # Live schema: Ticker is a select (auto-creates the option on write).
+        assert self.props[P.TICKER] == {"select": {"name": "TSLA"}}
 
     def test_price_per_share_encoded(self):
-        assert self.props["PPS"] == {"number": 142.86}
+        assert self.props[P.PRICE_PER_SHARE] == {"number": 142.86}
 
     def test_category_absent_when_none(self):
-        assert "Category" not in self.props
+        assert P.CATEGORY not in self.props
 
     def test_calculated_rewards_absent_when_none(self):
-        assert "Calculated Rewards" not in self.props
+        assert P.CALCULATED_REWARDS not in self.props
 
     def test_true_rewards_absent_when_none(self):
-        assert "True Rewards" not in self.props
+        assert P.TRUE_REWARDS not in self.props
 
     def test_bilt_points_absent_when_none(self):
-        assert "Bilt Points" not in self.props
+        assert P.BILT_POINTS not in self.props
 
 
 # ---------------------------------------------------------------------------
@@ -333,27 +335,27 @@ class TestCheckboxAlwaysEmitted:
         record = make_sparse_record()
         assert record.bilt_partner is False
         props = encode_transaction(record)
-        assert "Bilt Partner" in props
-        assert props["Bilt Partner"] == {"checkbox": False}
+        assert P.BILT_PARTNER in props
+        assert props[P.BILT_PARTNER] == {"checkbox": False}
 
     def test_bilt_partner_true_emitted(self):
         record = make_sparse_record()
         record.bilt_partner = True
         props = encode_transaction(record)
-        assert "Bilt Partner" in props
-        assert props["Bilt Partner"] == {"checkbox": True}
+        assert P.BILT_PARTNER in props
+        assert props[P.BILT_PARTNER] == {"checkbox": True}
 
     def test_excluded_from_spending_false_emitted(self):
         record = make_sparse_record()
         assert record.excluded_from_spending is False
         props = encode_transaction(record)
-        assert props["Excluded"] == {"checkbox": False}
+        assert props[P.EXCLUDED] == {"checkbox": False}
 
     def test_excluded_from_spending_true_emitted(self):
         record = make_sparse_record()
         record.excluded_from_spending = True
         props = encode_transaction(record)
-        assert props["Excluded"] == {"checkbox": True}
+        assert props[P.EXCLUDED] == {"checkbox": True}
 
 
 class TestReviewStatusEncoding:
@@ -361,7 +363,7 @@ class TestReviewStatusEncoding:
         record = make_sparse_record()
         assert record.review_status is None
         props = encode_transaction(record)
-        assert "Review Status" not in props
+        assert P.REVIEW_STATUS not in props
 
     def test_review_status_emitted_when_set(self):
         from notion_finance_sync.models import ReviewStatus
@@ -369,7 +371,7 @@ class TestReviewStatusEncoding:
         record = make_sparse_record()
         record.review_status = ReviewStatus.NEEDS_REVIEW
         props = encode_transaction(record)
-        assert props["Review Status"] == {"status": {"name": "Needs Review"}}
+        assert props[P.REVIEW_STATUS] == {"status": {"name": "Needs Review"}}
 
     def test_review_status_reviewed_value(self):
         from notion_finance_sync.models import ReviewStatus
@@ -377,7 +379,7 @@ class TestReviewStatusEncoding:
         record = make_sparse_record()
         record.review_status = ReviewStatus.REVIEWED
         props = encode_transaction(record)
-        assert props["Review Status"] == {"status": {"name": "Reviewed"}}
+        assert props[P.REVIEW_STATUS] == {"status": {"name": "Reviewed"}}
 
 
 # ---------------------------------------------------------------------------
@@ -396,13 +398,13 @@ class TestEncodeTransactionConsistency:
         record = make_sparse_record()
         props = encode_transaction(record)
         assert "Transacted At" not in props
-        assert "Category" not in props
-        assert "Bank" not in props
+        assert P.CATEGORY not in props
+        assert P.BANK not in props
 
     def test_bilt_partner_always_present(self):
         record = make_sparse_record()
         props = encode_transaction(record)
-        assert "Bilt Partner" in props
+        assert P.BILT_PARTNER in props
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +481,7 @@ class TestNotionClientUpdateFromRecord:
         await client.update_from_record(PAGE_ID, record)
 
         body = json.loads(respx_mock.calls[0].request.content)
-        assert body["properties"]["Qty"] == {"number": 3.5}
-        assert body["properties"]["Ticker"] == {"rich_text": [{"text": {"content": "TSLA"}}]}
-        assert body["properties"]["PPS"] == {"number": 142.86}
-        assert "Category" not in body["properties"]
+        assert body["properties"][P.QUANTITY] == {"number": 3.5}
+        assert body["properties"][P.TICKER] == {"select": {"name": "TSLA"}}
+        assert body["properties"][P.PRICE_PER_SHARE] == {"number": 142.86}
+        assert P.CATEGORY not in body["properties"]

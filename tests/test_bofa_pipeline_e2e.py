@@ -15,6 +15,7 @@ import pytest
 
 from notion_finance_sync.banks.bofa import assemble, card, deposit, rewards
 from notion_finance_sync.notion.encoders import encode_transaction
+from notion_finance_sync.notion.properties import P
 
 FX = Path(__file__).parent / "fixtures" / "bofa"
 
@@ -35,20 +36,20 @@ def card_first_record():
 def test_card_record_encodes_to_expected_notion_properties(card_first_record):
     props = encode_transaction(card_first_record)
 
-    assert props["Name"]["title"][0]["text"]["content"].startswith("PARADISE MARKET")
-    assert props["Txn Amount"]["number"] == -4.78
-    assert props["Transaction Date"]["date"]["start"] == "2026-06-24"  # detail's true date
-    assert props["Bank"]["select"]["name"] == "Bank of America"
-    assert props["Account Type"]["select"]["name"] == "Credit Card"
-    assert props["Category"]["select"]["name"] == "Groceries"
-    assert props["Bank Category"]["rich_text"][0]["text"]["content"] == "Groceries: Groceries"
-    assert props["Card Network"]["select"]["name"] == "Visa"
-    assert props["True Rewards"]["number"] == 12.55  # points (7.17 base + 5.38 bonus)
+    assert props[P.NAME]["title"][0]["text"]["content"].startswith("PARADISE MARKET")
+    assert props[P.AMOUNT]["number"] == -4.78
+    assert props[P.DATE]["date"]["start"] == "2026-06-24"  # detail's true date
+    assert props[P.BANK]["select"]["name"] == "Bank of America"
+    assert props[P.ACCOUNT_TYPE]["select"]["name"] == "Credit Card"
+    assert props[P.CATEGORY]["select"]["name"] == "Groceries"
+    assert props[P.BANK_CATEGORY]["rich_text"][0]["text"]["content"] == "Groceries: Groceries"
+    assert props[P.CARD_NETWORK]["select"]["name"] == "Visa"
+    assert props[P.TRUE_REWARDS]["number"] == 12.55  # points (7.17 base + 5.38 bonus)
     # source_id is a stable content hash now (BofA's per-row ref is unstable across views)
-    assert len(props["Transaction Source ID"]["rich_text"][0]["text"]["content"]) == 64
+    assert len(props[P.SOURCE_ID]["rich_text"][0]["text"]["content"]) == 64
     # two description fields: Payee = cleaned merchant, Memo = raw statement line
-    assert props["Payee"]["rich_text"][0]["text"]["content"] == "PARADISE MARKET"
-    assert props["Memo"]["rich_text"][0]["text"]["content"] == "PARADISE MARKET MIKONOS"
+    assert props[P.PAYEE]["rich_text"][0]["text"]["content"] == "PARADISE MARKET"
+    assert props[P.MEMO]["rich_text"][0]["text"]["content"] == "PARADISE MARKET MIKONOS"
 
 
 def test_deposit_zelle_record_encodes_as_transfer():
@@ -56,12 +57,12 @@ def test_deposit_zelle_record_encodes_as_transfer():
     rec = deposit.parse_activity(raw, account_name="Adv Plus Banking - 2093")[0]
     props = encode_transaction(rec)
 
-    assert props["Txn Amount"]["number"] == -50.0
-    assert props["Bank"]["select"]["name"] == "Bank of America"
-    assert props["Account Type"]["select"]["name"] == "Checking"
-    assert props["Category"]["select"]["name"] == "Transfer"  # Zelle auto-Transfer
+    assert props[P.AMOUNT]["number"] == -50.0
+    assert props[P.BANK]["select"]["name"] == "Bank of America"
+    assert props[P.ACCOUNT_TYPE]["select"]["name"] == "Checking"
+    assert props[P.CATEGORY]["select"]["name"] == "Transfer"  # Zelle auto-Transfer
     assert (
-        props["Bank Category"]["rich_text"][0]["text"]["content"]
+        props[P.BANK_CATEGORY]["rich_text"][0]["text"]["content"]
         == "Cash, Checks & Misc: Other Expenses"
     )
-    assert props["Account Name"]["rich_text"][0]["text"]["content"] == "Adv Plus Banking - 2093"
+    assert props[P.ACCOUNT_NAME]["rich_text"][0]["text"]["content"] == "Adv Plus Banking - 2093"
