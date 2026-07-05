@@ -24,6 +24,9 @@ from notion_finance_sync.models import (
 
 DEFAULT_ACCOUNT_NAME = "Individual Brokerage -5735"
 
+# Curated Notion "Credit Card / Account" select value (Alex approved 2026-07-05).
+NOTION_ACCOUNT = "E*Trade Brokerage"
+
 # activityType (raw label, kept as bank_category) -> canonical category.
 # Investment events: cash movements are Transfer, payouts are Income; trade
 # legs land in Other (the quantity/ticker/price fields carry the substance).
@@ -85,6 +88,7 @@ def parse_activities(
                 bank_category=activity_type or None,
                 category=CATEGORY_MAP.get(activity_type),
                 bank=BankName.ETRADE,
+                credit_card_account=NOTION_ACCOUNT,
                 account_type=AccountType.BROKERAGE,
                 account_name=account_name,
                 quantity=quantity or None,

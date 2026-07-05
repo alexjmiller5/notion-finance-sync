@@ -53,6 +53,7 @@ def test_ach_withdrawal_fields(raw):
     assert rec.status == TransactionStatus.POSTED
     assert rec.bank == BankName.ETRADE
     assert rec.account_type == AccountType.BROKERAGE
+    assert rec.credit_card_account == "E*Trade Brokerage"  # curated Notion select value
     assert rec.bank_category == "Online Transfer"
     assert rec.category == CanonicalCategory.TRANSFER
     assert rec.quantity is None
