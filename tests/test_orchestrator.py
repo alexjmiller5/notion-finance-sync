@@ -721,3 +721,46 @@ class TestRegistryHelpers:
 
         with pytest.raises(KeyError):
             get_scraper("nonexistent_bank")
+
+
+class TestOrphanReleaseBankScoped:
+    @pytest.mark.asyncio
+    async def test_other_banks_pending_row_survives_scoped_sync(self, respx_mock, monkeypatch):
+        """A scraper declaring BANKS must not release other banks' pending rows.
+
+        Regression: the first live bilt sync (2026-07-03) released a U.S. Bank
+        and a BofA pending row because orphan detection wasn't bank-scoped.
+        """
+        from notion_finance_sync.banks import registry
+        from notion_finance_sync.models import BankName
+        from notion_finance_sync.sync import orchestrator
+
+        fake = FakeBankScraper(records=[])
+        fake.BANKS = {BankName.BILT}
+        monkeypatch.setattr(registry, "BANK_REGISTRY", {"fake_bank": fake})
+
+        pending_rows = [
+            _existing_row(  # Bank select = "Bank of America" (helper default)
+                page_id="pending-bofa-1",
+                source_id="src-pending-bofa",
+                name="Other Bank Coffee",
+                amount=-3.50,
+                status="Pending",
+            ),
+        ]
+        respx_mock.post(QUERY_URL).mock(
+            return_value=httpx.Response(200, json=_query_response(pending_rows))
+        )
+        release_route = respx_mock.patch("https://api.notion.com/v1/pages/pending-bofa-1").mock(
+            return_value=httpx.Response(200, json={"object": "page", "id": "pending-bofa-1"})
+        )
+
+        result = await orchestrator.run_one_bank(
+            "fake_bank",
+            since=date(2026, 4, 1),
+            retry_pause_seconds=0,
+        )
+
+        assert result.status == "success"
+        assert result.pending_released == 0
+        assert release_route.call_count == 0

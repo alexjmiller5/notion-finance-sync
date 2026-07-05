@@ -88,6 +88,18 @@ def detect_orphans(
     return orphans
 
 
-def filter_pending(rows: dict[str, dict]) -> dict[str, dict]:
-    """Filter a dict of all Notion rows to just the Pending ones."""
-    return {sid: row for sid, row in rows.items() if row.get("status") == TransactionStatus.PENDING}
+def filter_pending(rows: dict[str, dict], *, banks: set | None = None) -> dict[str, dict]:
+    """Filter a dict of all Notion rows to just the Pending ones.
+
+    ``banks`` (values comparable to the row's ``bank`` select, e.g. ``BankName``
+    members) additionally scopes to those banks' rows — a single-bank sync must
+    never orphan-release another bank's pending rows. ``None`` = no bank scoping
+    (legacy behavior for scrapers that don't declare ``BANKS``).
+    """
+    bank_values = {str(b) for b in banks} if banks is not None else None
+    return {
+        sid: row
+        for sid, row in rows.items()
+        if row.get("status") == TransactionStatus.PENDING
+        and (bank_values is None or row.get("bank") in bank_values)
+    }

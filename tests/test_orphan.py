@@ -128,3 +128,25 @@ class TestFilterPending:
 
     def test_empty_input_returns_empty(self):
         assert filter_pending({}) == {}
+
+
+class TestFilterPendingBankScope:
+    """Cross-bank guard: a single-bank sync must never touch another bank's
+    pending rows (found live 2026-07-03 — the first bilt sync released a
+    U.S. Bank and a BofA pending row)."""
+
+    ROWS = {
+        "src-bilt": {"page_id": "pg-1", "status": "Pending", "bank": "Bilt"},
+        "src-bofa": {"page_id": "pg-2", "status": "Pending", "bank": "Bank of America"},
+        "src-posted": {"page_id": "pg-3", "status": "Posted", "bank": "Bilt"},
+    }
+
+    def test_scopes_to_given_banks(self):
+        from notion_finance_sync.models import BankName
+
+        result = filter_pending(self.ROWS, banks={BankName.BILT})
+        assert set(result.keys()) == {"src-bilt"}
+
+    def test_banks_none_keeps_legacy_behavior(self):
+        result = filter_pending(self.ROWS)
+        assert set(result.keys()) == {"src-bilt", "src-bofa"}
