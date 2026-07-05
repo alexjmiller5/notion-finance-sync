@@ -1,0 +1,105 @@
+{
+  "data": {
+    "transactions": [
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 213.47, "net": 116.49, "tax": 116.49},
+        "catDetail": {"txnTypeCode": "220", "txnCatDesc": "contribution"},
+        "date": 1782792000,
+        "dateDetail": {"tradedDate": 1782792000, "postedDate": 1782792000},
+        "description": "Contributions",
+        "quantity": "0.546",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "3957", "longName": "SP GLB EXUS IDX CL D", "quantity": 0.243, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 51.77, "net": 51.77, "fundCusip": "84679P611"}},
+          {"fundDetail": {"fundCode": "3957", "longName": "SP GLB EXUS IDX CL D", "quantity": 0.182, "srcName": "EMPLOYER MATCH", "srcNumber": "3", "contributor": "Employer", "contributorDescription": "Employer Contributions", "tax": 38.83, "net": 38.83, "fundCusip": "84679P611"}},
+          {"fundDetail": {"fundCode": "3957", "longName": "SP GLB EXUS IDX CL D", "quantity": 0.121, "srcName": "3% BASIC", "srcNumber": "4", "contributor": "Employer", "contributorDescription": "Employer Contributions", "tax": 25.89, "net": 25.89, "fundCusip": "84679P611"}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 24.58, "net": 504.79, "tax": 504.79},
+        "catDetail": {"txnTypeCode": "220", "txnCatDesc": "contribution"},
+        "date": 1782792000,
+        "dateDetail": {"tradedDate": 1782792000, "postedDate": 1782792000},
+        "description": "Contributions",
+        "quantity": "20.53",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "TF0Q", "longName": "STATE ST S&P 500 IDX", "quantity": 20.53, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 504.79, "net": 504.79}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 210.25, "net": -0.84, "tax": -0.54},
+        "catDetail": {"txnTypeCode": "560", "txnCatDesc": "fees"},
+        "date": 1782878400,
+        "dateDetail": {"tradedDate": 1782878400, "postedDate": 1782878400},
+        "description": "RECORDKEEPING FEE",
+        "quantity": "-0.003",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "3957", "longName": "SP GLB EXUS IDX CL D", "quantity": -0.003, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": -0.54, "net": -0.67}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"net": 0.30, "tax": 0},
+        "catDetail": {"txnTypeCode": "560", "txnCatDesc": "realizedGainLoss"},
+        "date": 1782878400,
+        "dateDetail": {"tradedDate": 1782878400, "postedDate": 1782878400},
+        "description": "Change in Market Value",
+        "quantity": "0",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "3957", "longName": "SP GLB EXUS IDX CL D", "quantity": 0, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 0, "net": 0.30}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 24.58, "net": 5826.15, "tax": 5826.15},
+        "catDetail": {"txnTypeCode": "620", "txnCatDesc": "exchangeIn"},
+        "date": 1767934800,
+        "dateDetail": {"tradedDate": 1767934800, "postedDate": 1767934800},
+        "description": "Exchanges",
+        "quantity": "237.0",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "TF0R", "longName": "US SMID CAP EQUITY", "quantity": 205.301, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 5046.29, "net": 5046.29}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 24.58, "net": -5826.15, "tax": -5826.15},
+        "catDetail": {"txnTypeCode": "620", "txnCatDesc": "exchangeOut"},
+        "date": 1767934800,
+        "dateDetail": {"tradedDate": 1767934800, "postedDate": 1767934800},
+        "description": "Exchanges",
+        "quantity": "-237.0",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "TF0S", "longName": "TARGET DATE 2060", "quantity": -237.0, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": -5826.15, "net": -5826.15}}
+        ]
+      },
+      {
+        "acctNum": "30072",
+        "amtDetail": {"price": 24.58, "net": 12.44, "tax": 0},
+        "catDetail": {"txnTypeCode": "300", "txnCatDesc": "dividend"},
+        "date": 1770000000,
+        "dateDetail": {"tradedDate": 1770000000, "postedDate": 1770000000},
+        "description": "Dividend",
+        "quantity": "0.506",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "TF0Q", "longName": "STATE ST S&P 500 IDX", "quantity": 0.506, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 0, "net": 12.44}}
+        ]
+      },
+      {
+        "acctNum": "259079998",
+        "amtDetail": {"net": 7000.0, "tax": 0},
+        "catDetail": {"txnTypeCode": "220", "txnCatDesc": "contribution"},
+        "date": 1770000000,
+        "dateDetail": {"tradedDate": 1770000000, "postedDate": 1770000000},
+        "description": "CASH CONTRIBUTION CURRENT YEAR (Cash)",
+        "quantity": "0",
+        "dcDetails": [
+          {"fundDetail": {"fundCode": "FXAIX", "longName": "FIDELITY 500 INDEX FUND", "quantity": 0, "srcName": "ROTH", "srcNumber": "2", "contributor": "Employee", "contributorDescription": "Employee Contributions", "tax": 0, "net": 7000.0}}
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

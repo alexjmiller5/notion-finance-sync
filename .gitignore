@@ -33,3 +33,6 @@ config/cards.yaml
 # Real transaction data used only as local test fixtures (sensitive)
 tests/fixtures/bofa/*.html
 tests/fixtures/bofa/deposit_activity_raw.json
+
+# Fidelity real 401k capture (sensitive) — keep local only
+tests/fixtures/fidelity/history_activity_real.json
