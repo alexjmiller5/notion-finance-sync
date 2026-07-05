@@ -50,7 +50,9 @@ class NotionClient:
         """
         transactions: dict[str, dict[str, Any]] = {}
         cursor: str | None = None
-        max_pages = 10  # higher than old project — we're scraping more accounts now
+        # Must exceed the total row count or dedup silently misses existing rows
+        # and re-creates duplicates. DB is ~1300+ rows and growing; 100/page.
+        max_pages = 100
 
         filter_body: dict[str, Any] = {}
         if since_date:
