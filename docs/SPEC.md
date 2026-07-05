@@ -167,7 +167,7 @@ notion-finance-sync/
 | `Related Transactions Amount` | rollup (sum of related txns' `Transaction Amount`) | Powers `Net Amount` |
 | `Net Amount` | formula (`Transaction Amount + Related Transactions Amount`) | Reimbursement-net spending |
 | `Quantity` | number (fractional, signed) | Share count for investment txns |
-| `Ticker` | text | Stock symbol (not select — too many possible values) |
+| `Ticker` | select | Stock symbol. A select (options auto-created on write) — a compact, filterable set in practice given a small portfolio. |
 | `Price Per Share` | number (dollar) | Cost basis per share |
 | `Bilt Points` | number | Cross-card Bilt rewards (orthogonal to `Calculated`/`True`) |
 | `Bilt Partner` | checkbox | Merchant is a Bilt Neighborhood Dining partner |
