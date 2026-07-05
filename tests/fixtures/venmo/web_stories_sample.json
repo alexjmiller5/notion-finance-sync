@@ -58,6 +58,56 @@
       "audience": "private",
       "note": {"type": "standardTransferNote", "date": "7/7/2026", "name": "TIAA BANK", "lastFour": "0172"},
       "title": {"titleType": "story", "payload": {"subType": "standardTransfer"}}
+    },
+    {
+      "id": "4629000000000000000",
+      "type": "authorization",
+      "subType": "authorization",
+      "amount": "- $16.68",
+      "date": "2026-06-28T01:17:32",
+      "audience": "private",
+      "note": {"content": ""},
+      "title": {
+        "titleType": "story",
+        "payload": {"subType": "authorization"},
+        "sender": {"id": "1111111111111111111", "displayName": "you", "username": "alexm521", "type": ""},
+        "receiver": {"id": "5555555555555555555", "displayName": "American Multi Cinema Inc", "username": "", "type": ""}
+      }
+    },
+    {
+      "id": "4628000000000000000",
+      "type": "refund",
+      "subType": "canceled",
+      "amount": "+ $10.00",
+      "date": "2026-06-27T04:34:52",
+      "audience": "private",
+      "note": {"type": "refundTargetNoteCancelled", "name": "a user on iMessage"},
+      "title": {"titleType": "story", "payload": {"subType": "refund"}}
+    },
+    {
+      "id": "4627000000000000000",
+      "type": "disbursement",
+      "subType": null,
+      "amount": "+ $72.00",
+      "date": "2026-06-26T23:25:32",
+      "audience": "private",
+      "note": {"content": "Your class-action settlement payment is now available in Venmo."},
+      "title": {
+        "titleType": "story",
+        "payload": {"subType": "disbursement"},
+        "sender": {"id": "6666666666666666666", "displayName": "Settlement Administrator", "username": "", "type": ""},
+        "receiver": {"id": "1111111111111111111", "displayName": "you", "username": "alexm521", "type": ""}
+      }
+    },
+    {
+      "id": "4626000000000000000",
+      "type": "transfer",
+      "subType": "instant",
+      "amount": "$459.52",
+      "date": "2026-06-25T19:11:09",
+      "audience": "private",
+      "note": {"type": "instantTransferNoteCompleted", "name": "BANK OF AMERICA N.A.", "lastFour": "9876"},
+      "title": {"titleType": "story", "payload": {"subType": "instantTransferComplete"}}
     }
   ]
 }

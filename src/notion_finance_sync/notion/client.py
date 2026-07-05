@@ -50,7 +50,11 @@ class NotionClient:
         """
         transactions: dict[str, dict[str, Any]] = {}
         cursor: str | None = None
-        max_pages = 10  # higher than old project — we're scraping more accounts now
+        # Safety bound only — the loop stops on has_more=False. Must exceed the total
+        # row count in the query window or a backfill's dedup silently misses existing
+        # rows and RE-CREATES them as duplicates (100 rows/page; a full-history
+        # backfill sees thousands). 500 pages = 50k rows of headroom.
+        max_pages = 500
 
         filter_body: dict[str, Any] = {}
         if since_date:

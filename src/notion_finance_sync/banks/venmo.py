@@ -41,6 +41,7 @@ import structlog
 from notion_finance_sync.models import (
     AccountType,
     BankName,
+    CanonicalCategory,
     CategoryMap,
     TransactionRecord,
     TransactionStatus,
@@ -83,28 +84,52 @@ def _parse_ts(s: str | None) -> datetime | None:
 def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
     """Parse an ``/api/stories?feedType=me`` response into TransactionRecords.
 
-    Only ``type == "payment"`` stories become records. Direction comes from the signed
-    ``amount`` string (negative = I sent, positive = I received); the counterparty is
-    the receiver when I sent, else the sender. Works for both ``pay`` and settled
-    ``charge`` stories (the amount sign already encodes which way the money moved).
+    Handles every story ``type`` Venmo emits:
+
+    - ``payment`` / ``authorization`` / ``disbursement`` — signed ``amount``, direction
+      from the sign (negative = money out, positive = in), counterparty from
+      ``title.receiver`` (when I sent) or ``title.sender``. ``authorization`` is a
+      Venmo debit-card purchase (counterparty = merchant); ``disbursement`` is an
+      inbound payout (e.g. a settlement). Category left None → Needs Review (SPEC §11).
+    - ``refund`` — signed ``amount``; no title.sender/receiver, so the counterparty is
+      ``note.name``. Category None.
+    - ``transfer`` — a Venmo↔bank cash-out; ``amount`` is UNSIGNED, so treat it as an
+      outflow (money leaving the Venmo balance to ``note.name`` bank). Category =
+      Transfer (excluded from spending reports; also prevents double-counting the many
+      transfers to Bank of America, which is separately scraped).
     """
     me = str(my_user_id)
     records: list[TransactionRecord] = []
     for story in raw.get("stories") or raw.get("data") or []:
-        if story.get("type") != "payment":
+        stype = story.get("type")
+        if stype not in ("payment", "authorization", "disbursement", "refund", "transfer"):
             continue
-        amount = _parse_amount(story.get("amount"))
-        i_sent = amount < 0
 
+        note = story.get("note") or {}
         title = story.get("title") or {}
-        counterparty = (title.get("receiver") if i_sent else title.get("sender")) or {}
-        cp_name = counterparty.get("displayName") or counterparty.get("username") or ""
-        name = f"Sent to {cp_name}" if i_sent else f"Received from {cp_name}"
-
-        note = story.get("note")
-        memo = note.get("content", "") if isinstance(note, dict) else (note or "")
         ts = _parse_ts(story.get("date"))
         txn_date = ts.astimezone(EASTERN).date() if ts else date.today()
+        category: CanonicalCategory | None = None
+        memo = note.get("content", "") if isinstance(note, dict) else (note or "")
+
+        if stype == "transfer":
+            # Unsigned amount; a bank cash-out is money leaving the Venmo balance.
+            amount = -abs(_parse_amount(story.get("amount")))
+            bank_name = (note.get("name") or "bank") if isinstance(note, dict) else "bank"
+            last4 = note.get("lastFour") if isinstance(note, dict) else None
+            cp_name = bank_name
+            name = f"Transfer to {bank_name}" + (f" ...{last4}" if last4 else "")
+            memo = ""
+            category = CanonicalCategory.TRANSFER
+        else:
+            amount = _parse_amount(story.get("amount"))
+            i_sent = amount < 0
+            if stype == "refund":
+                cp_name = (note.get("name") or "") if isinstance(note, dict) else ""
+            else:
+                party = (title.get("receiver") if i_sent else title.get("sender")) or {}
+                cp_name = party.get("displayName") or party.get("username") or ""
+            name = f"Sent to {cp_name}" if i_sent else f"Received from {cp_name}"
 
         records.append(
             TransactionRecord(
@@ -117,7 +142,7 @@ def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
                 status=TransactionStatus.POSTED,
                 payee=cp_name,
                 memo=memo,
-                category=None,  # Venmo doesn't categorize -> Needs Review (SPEC §11)
+                category=category,
                 bank=BankName.VENMO,
                 account_type=AccountType.P2P,
                 credit_card_account=NOTION_ACCOUNT,
