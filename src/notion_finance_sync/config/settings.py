@@ -39,6 +39,14 @@ logger = structlog.get_logger()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+class _EmailConfig(BaseModel):
+    gmail_address: str
+
+
+class _BiltConfig(BaseModel):
+    phone: str
+
+
 class _NotionConfig(BaseModel):
     transactions_database_id: str
     transactions_data_source_id: str
@@ -54,6 +62,8 @@ class _OnePasswordConfig(BaseModel):
 class _ProjectConfig(BaseModel):
     """Validated shape of config.toml (personal, non-secret identifiers)."""
 
+    email: _EmailConfig
+    bilt: _BiltConfig
     notion: _NotionConfig
     onepassword: _OnePasswordConfig
 
@@ -146,17 +156,18 @@ def get_gmail_app_password() -> str:
 def get_gmail_address() -> str:
     """Email address (the IMAP username) for the Gmail 2FA reader.
 
-    Read from the ``GMAIL_ADDRESS`` env var (set it in ``.env`` — gitignored — or
-    the deploy environment). Deliberately NOT hardcoded, to keep the personal
-    email out of source control.
+    From ``[email].gmail_address`` in config.toml (gitignored — never committed,
+    so the personal email stays out of source control). A ``GMAIL_ADDRESS`` env
+    var still overrides, for CI / ad-hoc runs.
     """
-    val = os.environ.get("GMAIL_ADDRESS")
-    if not val:
-        raise RuntimeError(
-            "GMAIL_ADDRESS is not set. Add it to .env (gitignored) or the deploy "
-            "environment (e.g. the launchd wrapper)."
-        )
-    return val
+    return os.environ.get("GMAIL_ADDRESS") or _CONFIG.email.gmail_address
+
+
+@cache
+def get_bilt_phone() -> str:
+    """Bilt SMS-OTP phone number (10 digits). From ``[bilt].phone`` in config.toml;
+    ``BILT_PHONE`` env still overrides."""
+    return os.environ.get("BILT_PHONE") or _CONFIG.bilt.phone
 
 
 def _bank_item_name(session_id: str) -> str:

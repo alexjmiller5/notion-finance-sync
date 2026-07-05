@@ -16,9 +16,13 @@ Roughly a half-day, most of it waiting on 2FA during the per-bank bootstrap.
 - [Determinate Nix](https://determinate.systems/nix) installed (the config sets
   `nix.enable = false` because Determinate manages the daemon).
 - Your two private repos reachable: `nix-config` and `notion-finance-sync`.
-- A GitHub token available to Nix for the private flake input — either make the
-  repo public, or add to `~/.config/nix/nix.conf`:
-  `access-tokens = github.com=<a GitHub PAT>`.
+- **Flake input auth** — `nix-config` pulls this repo's nix-darwin module as a
+  flake input. Since the app already runs from a local checkout (`checkoutDir`),
+  the simplest choice is a **local-path input** (`git+file://…`) — no GitHub auth
+  needed, and the module always matches the code that runs. If you instead use a
+  `github:` input on a **private** repo, Nix needs a token: make the repo public,
+  or add `access-tokens = github.com=<a GitHub PAT>` to `~/.config/nix/nix.conf`.
+  (Nix does NOT reuse the `gh` CLI's login.)
 
 ## 1. Clone both repos
 
@@ -36,8 +40,11 @@ The `checkoutDir` in `nix-config/hosts/mac-mini.nix` must match where you cloned
 ```bash
 cd ~/Desktop/coding/active-projects/notion-finance-sync
 cp config.example.toml config.toml
-# edit config.toml: your Notion database + data-source IDs, 1Password vault name,
-# and the session_id -> 1Password item map. (Gitignored — never committed.)
+# edit config.toml with YOUR values (gitignored — never committed):
+#   [email]  gmail_address        (email-2FA IMAP login)
+#   [bilt]   phone                (Bilt SMS-OTP number)
+#   [notion] the DB + data-source IDs
+#   [onepassword] vault, token ref, and the session_id -> 1Password item map
 ```
 
 If you recreated the Notion database (new IDs), also regenerate the pinned Notion
@@ -78,13 +85,11 @@ cd ~/Desktop/coding/active-projects/notion-finance-sync
 
 # 1Password service-account token -> macOS Keychain (encrypted at rest, never on disk):
 just store-op-token          # paste the token from 1Password (Personal vault)
-
-# Non-secret runtime env (gitignored). Your Gmail address for email-2FA banks:
-echo 'GMAIL_ADDRESS=you@example.com' > .env
 ```
 
 Bank passwords, the Notion API key, and the Gmail app password stay in 1Password
 and are read at runtime via `op` (the token above authenticates it unattended).
+Your Gmail address and Bilt phone are already in `config.toml` from step 2.
 
 ## 7. **[manual]** Grant Full Disk Access
 

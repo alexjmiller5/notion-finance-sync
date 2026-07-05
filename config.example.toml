@@ -7,6 +7,15 @@
 # password live in 1Password; the Gmail *address* lives in .env (gitignored).
 # This file holds only non-secret identifiers that differ per person/workspace.
 
+[email]
+# Address the SMS/email-2FA reader logs in as (the Gmail IMAP username). Some
+# banks send 2FA by email; the app password itself lives in 1Password.
+gmail_address = "you@example.com"
+
+[bilt]
+# Bilt auths by SMS OTP to this number (10 digits, no username/password vault item).
+phone = "5551234567"
+
 [notion]
 # Your Notion Transactions database. The data_source_id is what the API writes
 # to (GET https://api.notion.com/v1/databases/<id> returns it); see README §8.

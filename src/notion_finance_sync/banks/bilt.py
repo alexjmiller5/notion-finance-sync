@@ -253,18 +253,14 @@ def _browser_login(*, interactive: bool = False) -> dict:
     """Full browser login: phone -> SMS OTP -> (magic link) -> localStorage tokens.
 
     Bilt has NO username/password (not in 1Password by design) — auth is the
-    phone number + SMS to it. ``BILT_PHONE`` (10 digits) lives in ``.env``
-    (gitignored — keeps the personal number out of source control, like
-    ``GMAIL_ADDRESS``).
+    phone number + SMS to it. The number lives in ``[bilt].phone`` in config.toml
+    (gitignored — keeps the personal number out of source control).
     """
-    import os
-
     from notion_finance_sync.browser.factory import open_session
+    from notion_finance_sync.config.settings import get_bilt_phone
     from notion_finance_sync.twofa.sms import get_sms_code
 
-    phone = os.environ.get("BILT_PHONE")
-    if not phone:
-        raise RuntimeError("BILT_PHONE is not set. Add it to .env (gitignored).")
+    phone = get_bilt_phone()
 
     with open_session("bilt") as sb:
         try:
