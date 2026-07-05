@@ -155,6 +155,52 @@ just install-launchd
 
 Schedules `just sync` to run daily at ~03:30 local time + ±20 min jitter.
 
+## Deploy to a Mac Mini with Nix (nix-darwin)
+
+This repo is a flake. It exposes a **nix-darwin module** that installs Chrome,
+schedules the daily sync as a launchd user agent, and wires up logs — so a
+`darwin-rebuild switch` reproduces the whole deploy (steps 9's plist, declaratively).
+
+**1. Add the flake input** to your `nix-darwin` flake:
+
+```nix
+inputs.notion-finance-sync.url = "github:alexjmiller5/notion-finance-sync";
+# (add `inputs.nixpkgs.follows = "nixpkgs";` if you want a single nixpkgs)
+```
+
+**2. Import the module and enable it** in your `darwinConfiguration`:
+
+```nix
+{ inputs, ... }:
+{
+  imports = [ inputs.notion-finance-sync.darwinModules.default ];
+
+  services.notion-finance-sync = {
+    enable = true;
+    user = "alexmiller";
+    # A writable checkout in the user's home (uv builds the Python env here from
+    # uv.lock; data/ — sessions, snapshots, logs — is written under it).
+    checkoutDir = "/Users/alexmiller/notion-finance-sync";
+    hour = 3;          # optional — daily fire time (default 03:30)
+    minute = 30;
+  };
+}
+```
+
+`darwin-rebuild switch` then: adds the `google-chrome` cask, installs the `op`
+CLI, and creates the `com.notion-finance-sync.daily` launchd user agent.
+
+**3. One-time manual steps Nix can't do** (TCC/SIP-protected or secret-bearing —
+same as the imperative path above): clone the repo to `checkoutDir` and
+`uv sync`; store the 1Password token (`just store-op-token`, §3/§5); grant Full
+Disk Access to the sync process (§7); run each bank's first login once to
+establish its persistent Chrome profile (`just sync-bank <bank> --interactive`).
+
+Requirements: a `nix-darwin` host with `nix-homebrew` (for the Chrome cask) and
+`uv` on the user's PATH (e.g. via home-manager). See `nix/darwin.nix` for all
+options; regenerate pinned Notion property IDs with `uv run scripts/gen_property_ids.py`
+if you recreate the database.
+
 ## Architecture (one-liner)
 
 Phase 1: per-bank SeleniumBase scrapers (serial) → Notion. Phase 2: enrichers (Bilt portal, BofA rewards, Wells rewards) correlate to existing rows. Phase 3: health check, create Notion tasks for banks failing 3x today.
