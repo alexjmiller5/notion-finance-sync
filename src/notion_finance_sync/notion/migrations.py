@@ -31,7 +31,7 @@ logger = structlog.get_logger()
 # Constants — canonical schema definition
 
 # The exact formula expression for Net Amount (must match this string exactly)
-NET_AMOUNT_FORMULA = 'prop("Transaction Amount") + prop("Related Transactions Amount")'
+NET_AMOUNT_FORMULA = 'prop("Txn Amount") + prop("Related Transactions Amount")'
 
 # Property renames: {current_name: new_name}
 RENAMES: dict[str, str] = {
@@ -102,7 +102,7 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
             "type": "rollup",
             "rollup": {
                 "relation_property_name": "Related Transactions",
-                "rollup_property_name": "Transaction Amount",
+                "rollup_property_name": "Txn Amount",
                 "function": "sum",
             },
         },
@@ -110,7 +110,7 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
             "type": "formula",
             "formula": {"expression": NET_AMOUNT_FORMULA},
         },
-        "Quantity": {
+        "Qty": {
             "type": "number",
             "number": {"format": "number"},
         },
@@ -118,7 +118,7 @@ def _new_properties_spec(data_source_id: str) -> dict[str, dict[str, Any]]:
             "type": "rich_text",
             "rich_text": {},
         },
-        "Price Per Share": {
+        "PPS": {
             "type": "number",
             "number": {"format": "dollar"},
         },

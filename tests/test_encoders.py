@@ -109,7 +109,7 @@ class TestEncodeTransactionFullRecord:
         assert self.props["Name"] == {"title": [{"text": {"content": "Starbucks"}}]}
 
     def test_amount_encoded(self):
-        assert self.props["Transaction Amount"] == {"number": -5.75}
+        assert self.props["Txn Amount"] == {"number": -5.75}
 
     def test_transaction_date_encoded(self):
         assert self.props["Transaction Date"] == {"date": {"start": "2025-03-15"}}
@@ -172,9 +172,9 @@ class TestEncodeTransactionFullRecord:
         assert self.props["Bilt Partner"] == {"checkbox": True}
 
     def test_investment_fields_absent_when_none(self):
-        assert "Quantity" not in self.props
+        assert "Qty" not in self.props
         assert "Ticker" not in self.props
-        assert "Price Per Share" not in self.props
+        assert "PPS" not in self.props
 
     def test_excluded_computed_fields_not_present(self):
         assert "Related Transactions" not in self.props
@@ -195,7 +195,7 @@ class TestEncodeTransactionSparseRecord:
 
     def test_required_fields_present(self):
         assert "Name" in self.props
-        assert "Transaction Amount" in self.props
+        assert "Txn Amount" in self.props
         assert "Transaction Date" in self.props
         assert "Transaction Status" in self.props
         assert "Transaction Source ID" in self.props
@@ -245,13 +245,13 @@ class TestEncodeTransactionSparseRecord:
         assert self.props["Bilt Partner"] == {"checkbox": False}
 
     def test_quantity_absent_when_none(self):
-        assert "Quantity" not in self.props
+        assert "Qty" not in self.props
 
     def test_ticker_absent_when_none(self):
         assert "Ticker" not in self.props
 
     def test_price_per_share_absent_when_none(self):
-        assert "Price Per Share" not in self.props
+        assert "PPS" not in self.props
 
 
 # ---------------------------------------------------------------------------
@@ -308,13 +308,13 @@ class TestInvestmentRecord:
         self.props = encode_transaction(self.record)
 
     def test_quantity_encoded(self):
-        assert self.props["Quantity"] == {"number": 3.5}
+        assert self.props["Qty"] == {"number": 3.5}
 
     def test_ticker_encoded(self):
         assert self.props["Ticker"] == {"rich_text": [{"text": {"content": "TSLA"}}]}
 
     def test_price_per_share_encoded(self):
-        assert self.props["Price Per Share"] == {"number": 142.86}
+        assert self.props["PPS"] == {"number": 142.86}
 
     def test_category_absent_when_none(self):
         assert "Category" not in self.props
@@ -485,7 +485,7 @@ class TestNotionClientUpdateFromRecord:
         await client.update_from_record(PAGE_ID, record)
 
         body = json.loads(respx_mock.calls[0].request.content)
-        assert body["properties"]["Quantity"] == {"number": 3.5}
+        assert body["properties"]["Qty"] == {"number": 3.5}
         assert body["properties"]["Ticker"] == {"rich_text": [{"text": {"content": "TSLA"}}]}
-        assert body["properties"]["Price Per Share"] == {"number": 142.86}
+        assert body["properties"]["PPS"] == {"number": 142.86}
         assert "Category" not in body["properties"]

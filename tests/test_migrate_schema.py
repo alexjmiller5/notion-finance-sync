@@ -57,9 +57,9 @@ def make_schema(
 
     properties: dict = {
         "Name": {"id": "title", "name": "Name", "type": "title"},
-        "Transaction Amount": {
+        "Txn Amount": {
             "id": "amt",
-            "name": "Transaction Amount",
+            "name": "Txn Amount",
             "type": "number",
             "number": {"format": "dollar"},
         },
@@ -182,7 +182,7 @@ def make_schema(
             "type": "rollup",
             "rollup": {
                 "relation_property_name": "Related Transactions",
-                "rollup_property_name": "Transaction Amount",
+                "rollup_property_name": "Txn Amount",
                 "function": "sum",
             },
         }
@@ -192,9 +192,9 @@ def make_schema(
             "type": "formula",
             "formula": {"expression": NET_AMOUNT_FORMULA},
         }
-        properties["Quantity"] = {
+        properties["Qty"] = {
             "id": "qty",
-            "name": "Quantity",
+            "name": "Qty",
             "type": "number",
             "number": {"format": "number"},
         }
@@ -204,9 +204,9 @@ def make_schema(
             "type": "rich_text",
             "rich_text": {},
         }
-        properties["Price Per Share"] = {
+        properties["PPS"] = {
             "id": "pps",
-            "name": "Price Per Share",
+            "name": "PPS",
             "type": "number",
             "number": {"format": "dollar"},
         }
@@ -276,9 +276,9 @@ class TestComputeMigrationPlanNewFields:
         assert "Related Transactions" in plan.new_properties
         assert "Related Transactions Amount" in plan.new_properties
         assert "Net Amount" in plan.new_properties
-        assert "Quantity" in plan.new_properties
+        assert "Qty" in plan.new_properties
         assert "Ticker" in plan.new_properties
-        assert "Price Per Share" in plan.new_properties
+        assert "PPS" in plan.new_properties
         assert "Bilt Points" in plan.new_properties
         assert "Bilt Partner" in plan.new_properties
 
@@ -292,7 +292,7 @@ class TestComputeMigrationPlanNewFields:
         plan = compute_migration_plan(schema, data_source_id=DATA_SOURCE_ID)
         net_amount_def = plan.new_properties["Net Amount"]
         formula_expr = net_amount_def["formula"]["expression"]
-        assert formula_expr == 'prop("Transaction Amount") + prop("Related Transactions Amount")'
+        assert formula_expr == 'prop("Txn Amount") + prop("Related Transactions Amount")'
 
     def test_related_transactions_is_self_relation(self):
         schema = make_schema(has_old_names=True, has_new_fields=False)
@@ -306,7 +306,7 @@ class TestComputeMigrationPlanNewFields:
         plan = compute_migration_plan(schema, data_source_id=DATA_SOURCE_ID)
         rta_def = plan.new_properties["Related Transactions Amount"]
         assert rta_def["rollup"]["relation_property_name"] == "Related Transactions"
-        assert rta_def["rollup"]["rollup_property_name"] == "Transaction Amount"
+        assert rta_def["rollup"]["rollup_property_name"] == "Txn Amount"
         assert rta_def["rollup"]["function"] == "sum"
 
 
@@ -596,7 +596,7 @@ class TestApplyMigrationPlanActualPatch:
 
 class TestNetAmountFormula:
     def test_formula_is_exactly_correct(self):
-        expected = 'prop("Transaction Amount") + prop("Related Transactions Amount")'
+        expected = 'prop("Txn Amount") + prop("Related Transactions Amount")'
         assert NET_AMOUNT_FORMULA == expected
 
 

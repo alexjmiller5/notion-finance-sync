@@ -164,8 +164,14 @@ def _client() -> httpx.Client:
     )
 
 
-def _fetch_stories(client: httpx.Client, ext_id: str, since: date, *, max_pages: int = 60) -> dict:
-    """Page ``/api/stories`` (nextId cursor) back until older than ``since``."""
+def _fetch_stories(client: httpx.Client, ext_id: str, since: date, *, max_pages: int = 500) -> dict:
+    """Page ``/api/stories`` (nextId cursor) back until older than ``since``.
+
+    ``max_pages`` is only a safety bound: the loop stops early when the cursor runs
+    out or a page predates ``since``. Pages yield ~8-9 payment rows each (padded with
+    transfer/other story types), so a multi-year backfill needs a few hundred pages —
+    ~6 years of full history is ~200 pages; 500 leaves headroom.
+    """
     all_stories: list[dict] = []
     next_id: str | None = None
     for _ in range(max_pages):
