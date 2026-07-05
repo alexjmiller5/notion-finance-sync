@@ -27,12 +27,15 @@ data/card_quarterly_pools.json
 # Per-card reward rules (contains current choice categories, tier — personal)
 config/cards.yaml
 
+# SeleniumBase scratch
+downloaded_files/
+
 # macOS
 .DS_Store
 
 # Real transaction data used only as local test fixtures (sensitive)
 tests/fixtures/bofa/*.html
 tests/fixtures/bofa/deposit_activity_raw.json
-
 # Fidelity real 401k capture (sensitive) — keep local only
 tests/fixtures/fidelity/history_activity_real.json
+tests/fixtures/us_bank/

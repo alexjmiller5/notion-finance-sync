@@ -289,8 +289,9 @@ class TestOrphanRelease:
         from notion_finance_sync.banks import registry
         from notion_finance_sync.sync import orchestrator
 
-        # Scrape returns nothing — the existing pending row is an orphan
-        fake = FakeBankScraper(records=[])
+        # The scrape covers the same account (source_account_id 'acct-fake-1')
+        # but no longer contains the pending txn — it's an orphan.
+        fake = FakeBankScraper(records=[_make_record(source_id="src-other")])
         monkeypatch.setattr(registry, "BANK_REGISTRY", {"fake_bank": fake})
 
         pending_rows = [
@@ -304,6 +305,9 @@ class TestOrphanRelease:
         ]
         respx_mock.post(QUERY_URL).mock(
             return_value=httpx.Response(200, json=_query_response(pending_rows))
+        )
+        respx_mock.post(PAGES_URL).mock(
+            return_value=httpx.Response(200, json={"object": "page", "id": "new-page"})
         )
         release_route = respx_mock.patch("https://api.notion.com/v1/pages/pending-page-1").mock(
             return_value=httpx.Response(200, json={"object": "page", "id": "pending-page-1"})
@@ -321,6 +325,51 @@ class TestOrphanRelease:
         body = json.loads(release_route.calls[0].request.content)
         assert body["properties"]["Transaction Status"] == {"status": {"name": "Released"}}
         assert "Release Date" in body["properties"]
+
+    @pytest.mark.asyncio
+    async def test_does_not_release_other_accounts_pending_rows(self, respx_mock, monkeypatch):
+        """One bank's sync must not orphan another bank's pending rows.
+
+        Regression: the Notion DB holds every bank's rows, and an etrade sync
+        released pending BofA/US Bank rows live on 2026-07-03 (parallel per-bank
+        syncs). Pending rows whose Source Account ID wasn't part of this scrape
+        stay untouched.
+        """
+        from notion_finance_sync.banks import registry
+        from notion_finance_sync.sync import orchestrator
+
+        fake = FakeBankScraper(records=[_make_record(source_id="src-1")])
+        monkeypatch.setattr(registry, "BANK_REGISTRY", {"fake_bank": fake})
+
+        other_bank_pending = _existing_row(
+            page_id="other-bank-page",
+            source_id="src-other-bank-pending",
+            name="Other Bank Pending",
+            amount=-9.99,
+            status="Pending",
+        )
+        other_bank_pending["properties"]["Source Account ID"] = {
+            "rich_text": [{"plain_text": "acct-OTHER-bank"}]
+        }
+        respx_mock.post(QUERY_URL).mock(
+            return_value=httpx.Response(200, json=_query_response([other_bank_pending]))
+        )
+        respx_mock.post(PAGES_URL).mock(
+            return_value=httpx.Response(200, json={"object": "page", "id": "new-page"})
+        )
+        release_route = respx_mock.patch("https://api.notion.com/v1/pages/other-bank-page").mock(
+            return_value=httpx.Response(200, json={"object": "page", "id": "other-bank-page"})
+        )
+
+        result = await orchestrator.run_one_bank(
+            "fake_bank",
+            since=date(2026, 4, 1),
+            retry_pause_seconds=0,
+        )
+
+        assert result.status == "success"
+        assert result.pending_released == 0
+        assert release_route.call_count == 0
 
 
 # ---------------------------------------------------------------------------
