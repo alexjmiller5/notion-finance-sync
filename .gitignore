@@ -43,3 +43,6 @@ tests/fixtures/etrade/activities_v2.json
 tests/fixtures/etrade/espp_tables.json
 tests/fixtures/bilt/transactions_v2.json
 tests/fixtures/bilt/loyalty_activity.json
+
+# Local non-secret config (personal Notion/1Password identifiers)
+config.toml

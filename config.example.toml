@@ -1,0 +1,38 @@
+# notion-finance-sync — non-secret personal configuration.
+#
+# Copy this to `config.toml` (gitignored) and fill in YOUR values:
+#   cp config.example.toml config.toml
+#
+# SECRETS DO NOT GO HERE. Bank passwords, the Notion API key, and the Gmail app
+# password live in 1Password; the Gmail *address* lives in .env (gitignored).
+# This file holds only non-secret identifiers that differ per person/workspace.
+
+[notion]
+# Your Notion Transactions database. The data_source_id is what the API writes
+# to (GET https://api.notion.com/v1/databases/<id> returns it); see README §8.
+transactions_database_id = "00000000000000000000000000000000"
+transactions_data_source_id = "00000000-0000-0000-0000-000000000000"
+# Database that failure tasks are created in (can be the same workspace's Tasks DB).
+tasks_data_source_id = "00000000-0000-0000-0000-000000000000"
+
+[onepassword]
+# 1Password vault holding your bank credentials + project secrets.
+vault = "Notion Finance Sync"
+# op:// reference to the service-account token, used by the unattended launchd run
+# to export OP_SERVICE_ACCOUNT_TOKEN. Kept in a separate vault (a service account
+# can't grant access to its own host vault).
+service_account_token_ref = "op://Personal/Notion Finance Sync Service Account Token/password"
+
+# session_id  ->  1Password item name (or item id) holding that bank's login
+# (username + password fields). Add/remove entries to match the banks you run.
+# Use the item *id* when the title contains characters illegal in op:// refs (e.g. '*').
+[onepassword.bank_items]
+bofa = "BofA"
+bofa_investments = "BofA"        # shares the BofA login
+wells_fargo = "Wells Fargo"
+us_bank = "U.S. Bank"
+everbank = "Everbank"
+venmo = "Venmo"
+etrade = "REPLACE_WITH_ITEM_ID"  # title "E*Trade" has a '*', so reference by id
+fidelity = "Fidelity"
+# NB: some banks (e.g. Bilt) auth by phone device-trust and need no vault item.
