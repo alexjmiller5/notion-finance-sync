@@ -115,7 +115,6 @@ def parse_activity(
                 name=f"{description}: {long_name}" if long_name else description,
                 amount=float(amt.get("net", 0.0)),
                 transaction_date=datetime.fromtimestamp(traded, tz=UTC).date(),
-                transacted_at=None,
                 status=TransactionStatus.POSTED,
                 payee="",
                 memo=_memo(t),

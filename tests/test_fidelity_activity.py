@@ -55,7 +55,6 @@ def test_contribution_fields(raw):
     assert rec.price_per_share == 213.47
     assert rec.ticker == "3957"
     assert rec.transaction_date == date(2026, 6, 30)
-    assert rec.transacted_at is None
     assert rec.status == TransactionStatus.POSTED
     assert rec.bank == BankName.FIDELITY
     assert rec.account_type == AccountType.FOUR_OH_ONE_K
