@@ -157,6 +157,15 @@ Schedules `just sync` to run daily at ~03:30 local time + ±20 min jitter.
 
 ## Deploy to a Mac Mini with Nix (nix-darwin)
 
+> **Rebuilding from scratch (e.g. the Mini died)? Follow [`docs/DEPLOY.md`](docs/DEPLOY.md)**
+> — the complete ordered runbook. This section is the summary.
+
+Before anything, copy the config template and fill in your identifiers:
+
+```bash
+cp config.example.toml config.toml   # gitignored; Notion IDs, 1Password vault + bank-item map
+```
+
 This repo is a flake. It exposes a **nix-darwin module** that installs Chrome,
 schedules the daily sync as a launchd user agent, and wires up logs — so a
 `darwin-rebuild switch` reproduces the whole deploy (steps 9's plist, declaratively).
