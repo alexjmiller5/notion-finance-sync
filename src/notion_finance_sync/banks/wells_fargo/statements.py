@@ -119,7 +119,6 @@ def parse_statement_text(text: str, *, source_name: str = "") -> list[Transactio
                 name=description,
                 amount=amount,
                 transaction_date=txn_date,
-                transacted_at=None,
                 status=TransactionStatus.POSTED,
                 payee=description,
                 memo=description,
