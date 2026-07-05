@@ -119,7 +119,7 @@ def _existing_row(
         "id": page_id,
         "properties": {
             "Name": {"title": [{"plain_text": name}]},
-            "Transaction Amount": {"number": amount},
+            "Txn Amount": {"number": amount},
             "Transaction Date": {"date": {"start": transaction_date}},
             "Transaction Status": {"status": {"name": status}},
             "Transaction Source ID": {"rich_text": [{"plain_text": source_id}]},

@@ -54,7 +54,7 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
     props: dict[str, Any] = {}
 
     props["Name"] = _title(record.name)
-    props["Transaction Amount"] = _number(record.amount)
+    props["Txn Amount"] = _number(record.amount)
     props["Transaction Date"] = _date(record.transaction_date.isoformat())
     props["Transaction Status"] = _status(record.status.value)
     props["Transaction Source ID"] = _rich_text(record.source_id)
@@ -104,13 +104,13 @@ def encode_transaction(record: TransactionRecord) -> dict[str, Any]:
         props["Bilt Points"] = _number(record.bilt_points)
 
     if record.quantity is not None:
-        props["Quantity"] = _number(record.quantity)
+        props["Qty"] = _number(record.quantity)
 
     if record.ticker is not None:
         props["Ticker"] = _rich_text(record.ticker)
 
     if record.price_per_share is not None:
-        props["Price Per Share"] = _number(record.price_per_share)
+        props["PPS"] = _number(record.price_per_share)
 
     if record.review_status is not None:
         props["Review Status"] = _status(record.review_status.value)
