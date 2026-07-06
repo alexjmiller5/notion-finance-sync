@@ -4,15 +4,15 @@ Secrets resolution order:
 1. Environment variable (for CI / runtime overrides)
 2. 1Password CLI (`op read`) for local dev
 
-All Notion IDs are constants (not secrets).
+Notion IDs + 1Password references come from config.toml (gitignored; see
+config.example.toml) — not hardcoded here.
 
-1Password layout (per Alex's CLAUDE.md preference for service-account vaults
-on large/important projects):
+1Password layout:
 
-- Vault: "Notion Finance Sync" — holds all bank credentials and project secrets
-- Vault: "Personal" — holds the service account token for this project (token
-  itself is in Personal because a service account can't grant access to its
-  own host vault chicken-and-egg style)
+- The project vault (``[onepassword].vault`` — referenced by ID) holds all bank
+  credentials and project secrets.
+- A separate vault holds the service-account token (a service account can't grant
+  access to its own host vault), referenced by ``[onepassword].service_account_token_ref``.
 
 For unattended runs (launchd), export OP_SERVICE_ACCOUNT_TOKEN from the
 Personal-vault token before invoking the sync, and the service account will
@@ -51,6 +51,7 @@ class _NotionConfig(BaseModel):
     transactions_database_id: str
     transactions_data_source_id: str
     tasks_data_source_id: str
+    property_ids: dict[str, str]
 
 
 class _OnePasswordConfig(BaseModel):
@@ -106,6 +107,11 @@ OP_SERVICE_ACCOUNT_TOKEN_REF = _CONFIG.onepassword.service_account_token_ref
 # session_id -> 1Password item title/id (username + password fields). Banks that
 # auth by phone device-trust (e.g. Bilt) need no entry.
 OP_BANK_ITEM_BY_SESSION: dict[str, str] = _CONFIG.onepassword.bank_items
+
+
+def get_notion_property_ids() -> dict[str, str]:
+    """Stable Notion property IDs, keyed by internal name (see notion/properties.py)."""
+    return dict(_CONFIG.notion.property_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +188,7 @@ def _bank_item_name(session_id: str) -> str:
 
 
 def get_bank_username(session_id: str) -> str:
-    """Read a per-bank username from the Notion Finance Sync vault.
+    """Read a per-bank username from the project 1Password vault.
 
     `session_id` is the internal short identifier (e.g. 'bofa', 'us_bank'). The
     function maps it to the actual 1Password item title.
@@ -195,7 +201,7 @@ def get_bank_username(session_id: str) -> str:
 
 
 def get_bank_password(session_id: str) -> str:
-    """Read a per-bank password from the Notion Finance Sync vault."""
+    """Read a per-bank password from the project 1Password vault."""
     item = _bank_item_name(session_id)
     return _resolve(
         f"BANK_PASSWORD_{session_id.upper()}",

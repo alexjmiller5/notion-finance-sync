@@ -69,19 +69,19 @@ session), the login Keychain must be unlocked — fine on an auto-login Mac Mini
 auth mode (the scraper prompts for credentials), or use your normal `op signin`
 session and `export OP_SERVICE_ACCOUNT_TOKEN=$(security find-generic-password -a "$USER" -s notion-finance-sync-op-token -w)`.
 
-### 4. Populate per-bank credentials in the Notion Finance Sync vault
+### 4. Populate per-bank credentials in the project 1Password vault
 
 For each session that needs login automation, create a 1Password Login item
 in the `Notion Finance Sync` vault with `username` and `password` fields.
 
 Required items (one per active session):
-- `op://Notion Finance Sync/BofA/{username,password}` — covers BofA cards + checking + savings + Roth IRA + Investment Mgmt (one login)
-- `op://Notion Finance Sync/Wells Fargo/{username,password}`
-- `op://Notion Finance Sync/U.S. Bank/{username,password}`
-- `op://Notion Finance Sync/Everbank/{username,password}`
-- `op://Notion Finance Sync/Venmo/{username,password}`
-- `op://Notion Finance Sync/E*Trade/{username,password}`
-- `op://Notion Finance Sync/Fidelity/{username,password}`
+- `op://<vault>/BofA/{username,password}` — covers BofA cards + checking + savings + Roth IRA + Investment Mgmt (one login)
+- `op://<vault>/Wells Fargo/{username,password}`
+- `op://<vault>/U.S. Bank/{username,password}`
+- `op://<vault>/Everbank/{username,password}`
+- `op://<vault>/Venmo/{username,password}`
+- `op://<vault>/E*Trade/{username,password}`
+- `op://<vault>/Fidelity/{username,password}`
 
 **Bilt is intentionally NOT in this list.** Bilt verifies by sending an SMS
 code to Alex's phone number — there's no username/password flow to automate.
@@ -104,7 +104,7 @@ Or use the 1Password app/web UI.
 
 Create a Notion internal integration scoped to the Transactions database, then store the secret in the project vault as a Password or API Credential item titled `Notion Finance Sync Notion Internal Integration Secret` with a `credential` field.
 
-Reference path: `op://Notion Finance Sync/Notion Finance Sync Notion Internal Integration Secret/credential`
+Reference path: `op://<vault>/Notion Finance Sync Notion Internal Integration Secret/credential`
 
 ### 6. Gmail App Password for email 2FA reading
 
@@ -115,7 +115,7 @@ The email 2FA reader uses Gmail's IMAP gateway with an App Password (not OAuth).
 3. Create a new app password named `notion-finance-sync`.
 4. Store the 16-character output in 1Password as a Password or API Credential item titled `Gmail App Password` with a `credential` field.
 
-Reference path: `op://Notion Finance Sync/Gmail App Password/credential`
+Reference path: `op://<vault>/Gmail App Password/credential`
 
 The Gmail address itself is **required** via the `GMAIL_ADDRESS` env var (set it in your gitignored `.env`, or the deploy environment). It has no hardcoded default, to keep the personal email out of source control.
 

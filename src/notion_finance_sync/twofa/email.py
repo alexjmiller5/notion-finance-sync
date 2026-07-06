@@ -6,7 +6,7 @@ App Password setup (one-time, manual):
 1. Enable 2FA on the Google account.
 2. Account → Security → App Passwords → create a new one named
    "notion-finance-sync".
-3. Store the 16-character output at `op://Notion Finance Sync/Gmail App Password/credential`.
+3. Store the 16-character output at `op://<vault>/Gmail App Password/credential`.
 
 Why IMAP and not the Gmail API: app passwords authenticate only at the
 IMAP/POP/SMTP layer. OAuth (gmail-api-python-client) is the more "modern"

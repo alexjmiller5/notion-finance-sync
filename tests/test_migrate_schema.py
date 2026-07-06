@@ -33,7 +33,7 @@ from notion_finance_sync.notion.migrations import (
 # ---------------------------------------------------------------------------
 
 BASE_URL = "https://api.notion.com"
-DATA_SOURCE_ID = "REDACTED_NOTION_DATA_SOURCE_ID"
+DATA_SOURCE_ID = "00000000-0000-0000-0000-000000000000"
 SCHEMA_URL = f"{BASE_URL}/v1/data_sources/{DATA_SOURCE_ID}"
 
 TEST_API_KEY = "secret_test"

@@ -86,15 +86,15 @@ getters (already wired — do NOT hardcode):
 
 ```python
 from notion_finance_sync.config.settings import get_bank_username, get_bank_password
-u = get_bank_username("{BANK}")   # -> op://Notion Finance Sync/<item>/username
-p = get_bank_password("{BANK}")   # -> op://Notion Finance Sync/<item>/password
+u = get_bank_username("{BANK}")   # -> op://<vault>/<item>/username
+p = get_bank_password("{BANK}")   # -> op://<vault>/<item>/password
 ```
 
 1Password item names per bank (in `settings.OP_BANK_ITEM_BY_SESSION`):
 `us_bank`→"U.S. Bank", `wells_fargo`→"Wells Fargo", `everbank`→"Everbank", `venmo`→"Venmo",
 `etrade`→"E*Trade", `fidelity`→"Fidelity". **`bilt` is NOT in the vault** (SMS/device-trust — see §9).
 
-**Step 0 sanity check:** `op read "op://Notion Finance Sync/<item>/username"` to confirm your item
+**Step 0 sanity check:** `op read "op://<vault>/<item>/username"` to confirm your item
 exists with `username`/`password` fields. If the item name or field labels differ, fix
 `settings.OP_BANK_ITEM_BY_SESSION` (and note it for merge).
 
@@ -180,7 +180,7 @@ PYTHONPATH=src OP_SERVICE_ACCOUNT_TOKEN=... uv run python scripts/sync.py --bank
 ```
 
 This writes real rows to the live Transactions DB (safe to re-run; idempotent). Data source id:
-`REDACTED_NOTION_DATA_SOURCE_ID`.
+`<your-transactions-data-source-id>`.
 
 ---
 

@@ -24,13 +24,48 @@ transactions_data_source_id = "00000000-0000-0000-0000-000000000000"
 # Database that failure tasks are created in (can be the same workspace's Tasks DB).
 tasks_data_source_id = "00000000-0000-0000-0000-000000000000"
 
+# Stable Notion property IDs, keyed by our internal names. DON'T fill these by
+# hand — run `uv run scripts/gen_property_ids.py` against your database and paste
+# the block it prints. (These placeholders let a fresh clone import + unit-test.)
+[notion.property_ids]
+NAME = "title"
+AMOUNT = "AMOUNT"
+DATE = "DATE"
+STATUS = "STATUS"
+SOURCE_ID = "SOURCE_ID"
+SOURCE_ACCOUNT_ID = "SOURCE_ACCOUNT_ID"
+PAYEE = "PAYEE"
+MEMO = "MEMO"
+BANK_CATEGORY = "BANK_CATEGORY"
+CATEGORY = "CATEGORY"
+BANK = "BANK"
+CREDIT_CARD_ACCOUNT = "CREDIT_CARD_ACCOUNT"
+CARD_NETWORK = "CARD_NETWORK"
+ACCOUNT_TYPE = "ACCOUNT_TYPE"
+ACCOUNT_NAME = "ACCOUNT_NAME"
+CALCULATED_REWARDS = "CALCULATED_REWARDS"
+TRUE_REWARDS = "TRUE_REWARDS"
+REWARDS_TYPE = "REWARDS_TYPE"
+BILT_POINTS = "BILT_POINTS"
+BILT_PARTNER = "BILT_PARTNER"
+EXCLUDED = "EXCLUDED"
+QUANTITY = "QUANTITY"
+TICKER = "TICKER"
+PRICE_PER_SHARE = "PRICE_PER_SHARE"
+REVIEW_STATUS = "REVIEW_STATUS"
+RELEASE_DATE = "RELEASE_DATE"
+NET_AMOUNT = "NET_AMOUNT"
+RELATED_TRANSACTIONS = "RELATED_TRANSACTIONS"
+RELATED_TRANSACTIONS_AMOUNT = "RELATED_TRANSACTIONS_AMOUNT"
+
 [onepassword]
-# 1Password vault holding your bank credentials + project secrets.
-vault = "Notion Finance Sync"
+# 1Password vault holding your bank credentials + project secrets. Use the vault
+# ID (`op vault get "<name>" --format json` → .id) or its name.
+vault = "your-vault-id-or-name"
 # op:// reference to the service-account token, used by the unattended launchd run
 # to export OP_SERVICE_ACCOUNT_TOKEN. Kept in a separate vault (a service account
 # can't grant access to its own host vault).
-service_account_token_ref = "op://Personal/Notion Finance Sync Service Account Token/password"
+service_account_token_ref = "op://Personal/<Service Account Token item>/password"
 
 # session_id  ->  1Password item name (or item id) holding that bank's login
 # (username + password fields). Add/remove entries to match the banks you run.

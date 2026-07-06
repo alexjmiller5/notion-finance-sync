@@ -6,7 +6,7 @@ Run this yourself (it opens a real Chrome window and needs your phone for 2FA):
 
 Prerequisites:
   1. 1Password CLI signed in:            op signin
-  2. A "BofA" login item in the vault:    op://Notion Finance Sync/BofA/{username,password}
+  2. A "BofA" login item in the vault:    op://<vault>/BofA/{username,password}
   3. (optional) Full Disk Access for the terminal so the SMS 2FA code auto-reads
      from Messages. If not granted, the script pauses for you to type the code
      into the browser.
@@ -34,7 +34,7 @@ def main() -> int:
         "--manual",
         action="store_true",
         help="Prompt for credentials instead of reading them from 1Password. "
-        "Default reads from the 'Notion Finance Sync' vault (needs `op signin` or "
+        "Default reads from the project 1Password vault (needs `op signin` or "
         "OP_SERVICE_ACCOUNT_TOKEN).",
     )
     args = ap.parse_args()
@@ -53,8 +53,8 @@ def main() -> int:
             print("    1. Not signed in — run:  eval $(op signin)")
             print("       (or export OP_SERVICE_ACCOUNT_TOKEN for unattended use)")
             print("    2. Item/field names differ — expected:")
-            print("       op read 'op://Notion Finance Sync/BofA/username'")
-            print("       op read 'op://Notion Finance Sync/BofA/password'")
+            print("       op read 'op://<vault>/BofA/username'")
+            print("       op read 'op://<vault>/BofA/password'")
             print("  Or bypass 1Password for this run:  just validate-bofa-login --manual")
         return 1
 

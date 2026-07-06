@@ -1,6 +1,6 @@
 """Creates rows in Alex's Notion Tasks DB when a bank fails repeatedly.
 
-Tasks DB data source ID: REDACTED_NOTION_TASKS_ID
+Tasks DB data source ID: <your-tasks-data-source-id>
 """
 
 from __future__ import annotations

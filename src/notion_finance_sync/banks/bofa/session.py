@@ -85,7 +85,7 @@ def _resolve_credentials(session_id: str, auth: AuthMode) -> tuple[str, str]:
 
     - ``manual``: prompt in the terminal (password is not echoed). No 1Password
       needed — handy for a first validation run or when the vault isn't wired up.
-    - ``service_account``: read from the ``Notion Finance Sync`` vault via the
+    - ``service_account``: read from the project 1Password vault via the
       ``op`` CLI. For unattended runs, export ``OP_SERVICE_ACCOUNT_TOKEN`` first
       and the CLI authenticates with it (no interactive ``op signin`` needed).
     """
