@@ -49,3 +49,7 @@ config.toml
 
 # Stray snapshot path (login-failure screenshots)
 src/data/
+
+# nix build symlink
+result
+result-*
