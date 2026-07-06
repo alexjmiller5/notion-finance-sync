@@ -160,55 +160,58 @@ Schedules `just sync` to run daily at ~03:30 local time + ±20 min jitter.
 > **Rebuilding from scratch (e.g. the Mini died)? Follow [`docs/DEPLOY.md`](docs/DEPLOY.md)**
 > — the complete ordered runbook. This section is the summary.
 
-Before anything, copy the config template and fill in your identifiers:
+The app is a **Nix package** (built from `uv.lock` via [uv2nix](https://github.com/pyproject-nix/uv2nix)).
+`darwin-rebuild switch` builds it, renders `config.toml` from your nix options,
+installs Chrome + `op`, and schedules a launchd agent — **no repo checkout, no
+`uv sync`, no config file to place.**
 
-```bash
-cp config.example.toml config.toml   # gitignored; Notion IDs, 1Password vault + bank-item map
-```
-
-This repo is a flake. It exposes a **nix-darwin module** that installs Chrome,
-schedules the daily sync as a launchd user agent, and wires up logs — so a
-`darwin-rebuild switch` reproduces the whole deploy (steps 9's plist, declaratively).
-
-**1. Add the flake input** to your `nix-darwin` flake:
+**1. Add the flake input:**
 
 ```nix
 inputs.notion-finance-sync.url = "github:alexjmiller5/notion-finance-sync";
-# (add `inputs.nixpkgs.follows = "nixpkgs";` if you want a single nixpkgs)
+inputs.notion-finance-sync.inputs.nixpkgs.follows = "nixpkgs";
 ```
 
-**2. Import the module and enable it** in your `darwinConfiguration`:
+**2. Import the module + enable it** (import at the flake-modules level so `inputs`
+is in scope; the `settings` block is the non-secret `config.toml` as an attrset —
+see [`config.example.toml`](config.example.toml)):
 
 ```nix
-{ inputs, ... }:
-{
-  imports = [ inputs.notion-finance-sync.darwinModules.default ];
-
-  services.notion-finance-sync = {
-    enable = true;
-    user = "alexmiller";
-    # A writable checkout in the user's home (uv builds the Python env here from
-    # uv.lock; data/ — sessions, snapshots, logs — is written under it).
-    checkoutDir = "/Users/alexmiller/notion-finance-sync";
-    hour = 3;          # optional — daily fire time (default 03:30)
-    minute = 30;
+# in your darwinSystem modules list:  inputs.notion-finance-sync.darwinModules.default
+services.notion-finance-sync = {
+  enable = true;
+  user = "alexmiller";
+  hour = 3; minute = 30;          # optional (default 03:30)
+  settings = {
+    email.gmail_address = "you@example.com";
+    bilt.phone = "5551234567";
+    notion = {
+      transactions_database_id = "…"; transactions_data_source_id = "…";
+      tasks_data_source_id = "…";
+      property_ids = { NAME = "title"; /* … from gen_property_ids.py … */ };
+    };
+    onepassword = {
+      vault = "<vault-id>";
+      service_account_token_ref = "op://Personal/<token item>/password";
+      bank_items = { bofa = "BofA"; /* … */ };
+    };
   };
-}
+};
 ```
 
-`darwin-rebuild switch` then: adds the `google-chrome` cask, installs the `op`
-CLI, and creates the `com.notion-finance-sync.daily` launchd user agent.
+`darwin-rebuild switch` then builds everything and creates the
+`com.notion-finance-sync.daily` launchd user agent. State (Chrome profiles,
+snapshots, logs) lives in `~/Library/Application Support/notion-finance-sync/`.
 
-**3. One-time manual steps Nix can't do** (TCC/SIP-protected or secret-bearing —
-same as the imperative path above): clone the repo to `checkoutDir` and
-`uv sync`; store the 1Password token (`just store-op-token`, §3/§5); grant Full
-Disk Access to the sync process (§7); run each bank's first login once to
-establish its persistent Chrome profile (`just sync-bank <bank> --interactive`).
+**3. One-time manual steps Nix can't do** (TCC/SIP-protected, secret, or
+interactive): iPhone → Text Message Forwarding to the Mini; store the 1Password
+token in the Keychain; grant Full Disk Access; run each bank's first login once
+(`--bank <bank> --interactive`). See [`docs/DEPLOY.md`](docs/DEPLOY.md) steps 3–6.
 
-Requirements: a `nix-darwin` host with `nix-homebrew` (for the Chrome cask) and
-`uv` on the user's PATH (e.g. via home-manager). See `nix/darwin.nix` for all
-options; regenerate pinned Notion property IDs with `uv run scripts/gen_property_ids.py`
-if you recreate the database.
+Requirements: a `nix-darwin` host with `nix-homebrew` (Chrome cask) and
+`allowUnfree` for the `1password-cli`. See `nix/darwin.nix` for all module options;
+regenerate `property_ids` with `uv run scripts/gen_property_ids.py` if you recreate
+the database.
 
 ## Architecture (one-liner)
 

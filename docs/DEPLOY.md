@@ -1,145 +1,123 @@
 # Deploy runbook — rebuild the Mac Mini sync from scratch
 
-The complete, ordered process to get the daily sync running on a fresh Mac Mini
-(e.g. the old one died). Follow top to bottom. Steps marked **[manual]** cannot
-be automated (TCC/SIP-protected, secret-bearing, or interactive) — everything
-else is `darwin-rebuild`.
+The complete, ordered process to get the daily sync running on a fresh Mac Mini.
+The app is a **Nix package** (built from `uv.lock` via uv2nix): `darwin-rebuild
+switch` builds it, renders `config.toml` from your nix options, and installs the
+launchd agent — **no repo checkout, no `uv sync`, no config file to place.**
 
-Roughly a half-day, most of it waiting on 2FA during the per-bank bootstrap.
+Steps marked **[manual]** can't be automated (TCC/SIP-protected, secret-bearing,
+or interactive). Everything else is one `darwin-rebuild`.
 
 ---
 
-## 0. Prerequisites (once per machine)
+## 0. Prerequisites
 
-- macOS on the Mac Mini, signed into **[manual]** the Apple ID whose iMessage/SMS
-  you'll read 2FA from (Settings → Apple ID). Required for step 5.
-- [Determinate Nix](https://determinate.systems/nix) installed (the config sets
-  `nix.enable = false` because Determinate manages the daemon).
-- Your two private repos reachable: `nix-config` and `notion-finance-sync`.
-- **Flake input auth** — `nix-config` pulls this repo's nix-darwin module as a
-  flake input. Since the app already runs from a local checkout (`checkoutDir`),
-  the simplest choice is a **local-path input** (`git+file://…`) — no GitHub auth
-  needed, and the module always matches the code that runs. If you instead use a
-  `github:` input on a **private** repo, Nix needs a token: make the repo public,
-  or add `access-tokens = github.com=<a GitHub PAT>` to `~/.config/nix/nix.conf`.
-  (Nix does NOT reuse the `gh` CLI's login.)
+- macOS on the Mac Mini, signed into **[manual]** the Apple ID you'll read 2FA
+  SMS from (Settings → Apple ID). Needed for step 3.
+- [Determinate Nix](https://determinate.systems/nix) (the config sets
+  `nix.enable = false` — Determinate manages the daemon).
+- `nix-config` reachable (your nix-darwin flake, with `nix-homebrew`). The
+  `notion-finance-sync` flake input is a **public** repo, so no GitHub token.
 
-## 1. Clone both repos
+## 1. Configure it in `nix-config`
 
-```bash
-mkdir -p ~/Desktop/coding/active-projects && cd ~/Desktop/coding/active-projects
-git clone git@github.com:alexjmiller5/nix-config.git
-git clone git@github.com:alexjmiller5/notion-finance-sync.git
+The module (`services.notion-finance-sync`) is already wired into `hosts/mac-mini.nix`:
+enable it, set `user`, and provide `settings` — the non-secret `config.toml` as a
+nix attrset (Notion IDs, the property-ID map, 1Password vault ID, bank→item map,
+Gmail, Bilt phone). Secrets are NOT here — they stay in 1Password.
+
+```nix
+services.notion-finance-sync = {
+  enable = true;
+  user = "alexmiller";
+  settings = {
+    email.gmail_address = "…";
+    bilt.phone = "…";
+    notion = { transactions_data_source_id = "…"; property_ids = { … }; … };
+    onepassword = { vault = "<vault-id>"; bank_items = { … }; … };
+  };
+};
 ```
 
-The `checkoutDir` in `nix-config/hosts/mac-mini.nix` must match where you cloned
-`notion-finance-sync` (default: the path above).
+If you recreated the Notion database (new IDs), regenerate the `property_ids`
+block: `NFS_CONFIG=… uv run scripts/gen_property_ids.py` prints a `[notion.property_ids]`
+TOML block — translate it to the nix attrset (or update `config.toml` and re-derive).
 
-## 2. Create `config.toml` (non-secret personal identifiers)
-
-```bash
-cd ~/Desktop/coding/active-projects/notion-finance-sync
-cp config.example.toml config.toml
-# edit config.toml with YOUR values (gitignored — never committed):
-#   [email]  gmail_address        (email-2FA IMAP login)
-#   [bilt]   phone                (Bilt SMS-OTP number)
-#   [notion] the DB + data-source IDs
-#   [onepassword] vault, token ref, and the session_id -> 1Password item map
-```
-
-If you recreated the Notion database (new IDs), also regenerate the pinned Notion
-property IDs after step 4/6:
-`OP_SERVICE_ACCOUNT_TOKEN=... uv run scripts/gen_property_ids.py`.
-
-## 3. Install the Python env
+## 2. `darwin-rebuild switch` — the automated everything
 
 ```bash
-uv sync    # builds .venv from uv.lock (uv comes from home-manager)
-```
-
-## 4. `darwin-rebuild switch` — the automated half
-
-```bash
-cd ~/Desktop/coding/active-projects/nix-config
+cd ~/…/nix-config
 sudo darwin-rebuild switch --flake .#mac-mini
 ```
 
-This installs **Google Chrome** (homebrew cask), the **`op`** CLI, and the
-**`com.notion-finance-sync.daily`** launchd user agent (fires 03:30 daily). It
-does NOT start syncing yet — the manual steps below must come first.
+This builds the app into the store, generates `config.toml`, installs the
+**google-chrome** cask + the **`op`** CLI, and creates the
+`com.notion-finance-sync.daily` launchd **user** agent (fires 03:30 daily). State
+(Chrome profiles, snapshots, logs) lives in `~/Library/Application Support/notion-finance-sync/`.
 
-## 5. **[manual]** Route 2FA to the Mac Mini
+The agent doesn't sync yet — the manual bits below come first.
 
-The SMS reader reads the Mac's Messages database, so the Mini must receive the
-codes:
+## 3. **[manual]** Route 2FA to the Mac Mini
 
-- On your **iPhone**: Settings → Messages → **Text Message Forwarding** → enable
-  the Mac Mini. (Same Apple ID; the Mini shows a code to confirm.)
-- Some banks 2FA by **email** instead — those use the Gmail app password from
-  1Password + `GMAIL_ADDRESS` in `.env` (step 6).
+On your **iPhone**: Settings → Messages → **Text Message Forwarding** → enable the
+Mac Mini (same Apple ID; confirm the code it shows). Email-2FA banks use the Gmail
+app password from 1Password instead.
 
-## 6. **[manual]** Secrets + non-secret env
+## 4. **[manual]** Store the 1Password token in the Keychain
 
-```bash
-cd ~/Desktop/coding/active-projects/notion-finance-sync
-
-# 1Password service-account token -> macOS Keychain (encrypted at rest, never on disk):
-just store-op-token          # paste the token from 1Password (Personal vault)
-```
-
-Bank passwords, the Notion API key, and the Gmail app password stay in 1Password
-and are read at runtime via `op` (the token above authenticates it unattended).
-Your Gmail address and Bilt phone are already in `config.toml` from step 2.
-
-## 7. **[manual]** Grant Full Disk Access
-
-The 2FA reader opens `~/Library/Messages/chat.db`, which macOS gates behind Full
-Disk Access (SIP-protected — no CLI can grant it):
-
-1. System Settings → Privacy & Security → **Full Disk Access**.
-2. Add the process that runs the sync: `uv` (`~/.nix-profile/bin/uv` or
-   `/etc/profiles/per-user/<you>/bin/uv`) and/or your terminal.
-3. Quit and reopen the terminal.
-
-Verify: `sqlite3 ~/Library/Messages/chat.db "SELECT COUNT(*) FROM message"` — a
-number means it's granted; `unable to open database file` means it isn't.
-
-## 8. Notion schema (only if the database is new)
+The service-account token is the bootstrap secret (unlocks every other secret) — it
+can't live in Nix. Store it in the login Keychain:
 
 ```bash
-just migrate     # creates/renames properties; skip if the DB already has the schema
+security add-generic-password -a "$USER" -s notion-finance-sync-op-token -w '<TOKEN>' -U
 ```
 
-## 9. **[manual]** Bootstrap each bank — one at a time
+(The runner reads it via `security find-generic-password` and exports
+`OP_SERVICE_ACCOUNT_TOKEN` so `op` authenticates unattended.)
 
-The first login per bank establishes its persistent Chrome profile + device
-trust, so later runs are unattended. Do them **one at a time**, watching the 2FA:
+## 5. **[manual]** Grant Full Disk Access
+
+The 2FA reader opens `~/Library/Messages/chat.db` (SIP-protected). System Settings →
+Privacy & Security → **Full Disk Access** → add the launchd-run binary
+(`/nix/store/…-notion-finance-sync-env/bin/notion-finance-sync`) — or, more simply,
+your terminal, and run the first bootstraps (step 6) from it. Re-login after.
+
+Verify: `sqlite3 ~/Library/Messages/chat.db "SELECT COUNT(*) FROM message"` returns
+a number (not `unable to open database file`).
+
+## 6. **[manual]** Bootstrap each bank — one at a time
+
+The first login per bank establishes its persistent Chrome profile + device trust,
+so later runs are unattended. Run the packaged binary directly, one bank at a time,
+watching the 2FA:
 
 ```bash
-just sync-bank bofa --interactive
-# ...confirm rows land in Notion, then the next:
-just sync-bank wells_fargo --interactive
-# us_bank, everbank, venmo, etrade, fidelity, bofa_investments, bilt ...
+BIN=$(readlink -f /run/current-system/sw/bin 2>/dev/null); # or find the env in the store
+export NFS_STATE_DIR="$HOME/Library/Application Support/notion-finance-sync"
+export OP_SERVICE_ACCOUNT_TOKEN=$(security find-generic-password -a "$USER" -s notion-finance-sync-op-token -w)
+notion-finance-sync --bank bofa --interactive     # if the binary is on PATH; else use the store path
+# …then wells_fargo, us_bank, everbank, venmo, etrade, fidelity, bofa_investments, bilt
 ```
 
-(Start with `bofa` — it's the most-proven path.) `bilt` auths by phone
-device-trust, not a vault password.
+(Start with `bofa` — most-proven. `bilt` auths by phone device-trust, no vault item.)
+The binary's store path is in the launchd runner:
+`grep exec ~/…/nix-config/result` after a build, or `launchctl print`.
 
-## 10. Done — it's now unattended
+## 7. Done — unattended
 
 Once every bank bootstraps clean, the launchd agent runs the full sync daily at
-03:30. Nothing above repeats **unless a bank's device-trust expires** (you'll see
-it fail in the logs) — then just re-run step 9 for that one bank.
+03:30. Nothing above repeats **unless a bank's device-trust expires** — then re-do
+step 6 for that one bank.
 
-- Logs: `data/launchd.log` and `data/launchd.err.log` in the checkout.
-- Manual run anytime: `just sync` (all) or `just sync-bank <bank>`.
+- Logs: `~/Library/Application Support/notion-finance-sync/launchd.{log,err.log}`.
 - Health: banks failing 3× in a day auto-create a Notion task (SPEC §3).
 
 ## What repeats, what doesn't
 
 | Trigger | Redo |
 |---|---|
-| New code / config | `git pull` + `uv sync` (+ `darwin-rebuild switch` if the module changed) |
-| A bank's device-trust expired | step 9 for that bank only |
-| Recreated the Notion DB | `config.toml` IDs + `gen_property_ids.py` + `just migrate` |
+| New app version | bump the flake input (`nix flake update notion-finance-sync` in nix-config) + `darwin-rebuild switch` |
+| Config change (IDs, banks) | edit `settings` in `hosts/mac-mini.nix` + `darwin-rebuild switch` |
+| A bank's device-trust expired | step 6 for that bank only |
+| Recreated the Notion DB | regenerate `property_ids` (step 1) + `just migrate` |
 | Fresh Mac Mini | this whole runbook |
