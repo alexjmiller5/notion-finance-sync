@@ -46,3 +46,6 @@ tests/fixtures/bilt/loyalty_activity.json
 
 # Local non-secret config (personal Notion/1Password identifiers)
 config.toml
+
+# Stray snapshot path (login-failure screenshots)
+src/data/
