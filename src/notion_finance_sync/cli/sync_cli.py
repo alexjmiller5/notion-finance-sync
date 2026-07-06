@@ -116,7 +116,12 @@ async def main(argv: list[str] | None = None) -> int:
     return 1 if any_failed else 0
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (``notion-finance-sync``): run the async main."""
     import asyncio
 
     sys.exit(asyncio.run(main()))
+
+
+if __name__ == "__main__":
+    run()

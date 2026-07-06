@@ -75,13 +75,17 @@ def _load_config() -> _ProjectConfig:
     The fallback lets a fresh clone / CI import + run unit tests; live runs need a
     real config.toml (copy config.example.toml and fill in your values).
     """
-    path = _REPO_ROOT / "config.toml"
-    if not path.exists():
-        path = _REPO_ROOT / "config.example.toml"
+    override = os.environ.get("NFS_CONFIG")
+    if override:
+        path = Path(override).expanduser()
+    else:
+        path = _REPO_ROOT / "config.toml"
+        if not path.exists():
+            path = _REPO_ROOT / "config.example.toml"
     if not path.exists():
         raise RuntimeError(
-            "No config.toml or config.example.toml found. Copy config.example.toml "
-            "to config.toml and fill in your Notion/1Password identifiers."
+            f"config file not found ({path}). Set NFS_CONFIG, or copy "
+            "config.example.toml to config.toml and fill in your identifiers."
         )
     with open(path, "rb") as f:
         return _ProjectConfig.model_validate(tomllib.load(f))

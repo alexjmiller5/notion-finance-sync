@@ -19,14 +19,15 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, date, datetime
-from pathlib import Path
 from typing import TypedDict
 
 import structlog
 
+from notion_finance_sync.config.paths import HEALTH_FILE
+
 logger = structlog.get_logger()
 
-HEALTH_FILE = Path(__file__).resolve().parents[3] / "data" / "health.json"
+HEALTH_FILE = HEALTH_FILE
 FAILURE_THRESHOLD = 3
 
 

@@ -14,14 +14,15 @@ Usage:
 from __future__ import annotations
 
 from contextlib import contextmanager
-from pathlib import Path
 
 import structlog
 from seleniumbase import SB
 
+from notion_finance_sync.config.paths import SESSIONS_DIR
+
 logger = structlog.get_logger()
 
-SESSIONS_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions"
+SESSIONS_DIR = SESSIONS_DIR
 
 
 @contextmanager

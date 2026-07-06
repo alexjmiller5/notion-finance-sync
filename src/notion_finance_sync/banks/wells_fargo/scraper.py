@@ -23,12 +23,13 @@ import structlog
 
 from notion_finance_sync.banks.wells_fargo import session, statements
 from notion_finance_sync.banks.wells_fargo.notify import notify_wells_fargo_activity
+from notion_finance_sync.config.paths import STATEMENTS_DIR
 from notion_finance_sync.models import CanonicalCategory, CategoryMap, TransactionRecord
 
 logger = structlog.get_logger()
 
 # WF statement PDFs (gitignored). MMDDYY WellsFargo.pdf, the old-Bilt-era + Autograph months.
-STATEMENTS_DIR = Path(__file__).resolve().parents[4] / "data" / "statements" / "wf"
+STATEMENTS_DIR = STATEMENTS_DIR / "wf"
 
 
 class WellsFargoScraper:

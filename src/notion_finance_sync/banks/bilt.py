@@ -28,6 +28,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import structlog
 
+from notion_finance_sync.config.paths import SESSIONS_DIR, SNAPSHOTS_DIR
 from notion_finance_sync.models import (
     AccountType,
     BankName,
@@ -45,7 +46,7 @@ KEYCLOAK_TOKEN_URL = "https://www.bilt.com/realms/BILT/protocol/openid-connect/t
 KEYCLOAK_CLIENT_ID = "identity-svc"
 LOGIN_URL = "https://www.bilt.com/login/phone"
 
-TOKENS_PATH = Path(__file__).resolve().parents[3] / "data" / "sessions" / "bilt" / "tokens.json"
+TOKENS_PATH = SESSIONS_DIR / "bilt" / "tokens.json"
 
 # Bilt sends the OTP by SMS from this number; real message (2026-07-03):
 #   "DON'T share this code with anyone. Bilt agents will NEVER ask for this
@@ -224,7 +225,7 @@ def get_access_token(*, interactive: bool = False) -> str:
 
 def _login_failure_screenshot(sb) -> None:
     try:
-        folder = Path(__file__).resolve().parents[3] / "data" / "snapshots" / "bilt"
+        folder = SNAPSHOTS_DIR / "bilt"
         folder.mkdir(parents=True, exist_ok=True)
         name = f"login_failure_{datetime.now(tz=UTC).strftime('%H%M%S')}.png"
         sb.cdp.save_screenshot(name, folder=str(folder))

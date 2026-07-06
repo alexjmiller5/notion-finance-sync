@@ -16,6 +16,9 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
 ]
 
+[project.scripts]
+notion-finance-sync = "notion_finance_sync.cli.sync_cli:run"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",

@@ -17,12 +17,12 @@ from __future__ import annotations
 import getpass
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Literal
 
 import structlog
 
 from notion_finance_sync.browser.factory import open_session
+from notion_finance_sync.config.paths import SNAPSHOTS_DIR
 from notion_finance_sync.config.settings import get_bank_password, get_bank_username
 from notion_finance_sync.twofa.sms import get_sms_code
 
@@ -69,7 +69,7 @@ _TXNS_QUERY = """query txnsDetails($input: TxnsAcctSearchRequestInput) {
     }
   } } }"""
 
-_SNAP_DIR = Path(__file__).resolve().parents[4] / "data" / "snapshots" / "us_bank"
+_SNAP_DIR = SNAPSHOTS_DIR / "us_bank"
 
 
 def _set_input(sb, selector: str, value: str) -> bool:

@@ -38,6 +38,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import structlog
 
+from notion_finance_sync.config.paths import SESSIONS_DIR
 from notion_finance_sync.models import (
     AccountType,
     BankName,
@@ -57,7 +58,7 @@ _UA = (
     "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 )
 
-_SESSION_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions" / "venmo"
+_SESSION_DIR = SESSIONS_DIR / "venmo"
 _COOKIES_FILE = _SESSION_DIR / "cookies.json"
 _EXTID_FILE = _SESSION_DIR / "external_id.txt"
 

@@ -29,6 +29,7 @@ import httpx
 import structlog
 
 from notion_finance_sync.browser.factory import open_session
+from notion_finance_sync.config.paths import SNAPSHOTS_DIR
 from notion_finance_sync.config.settings import get_bank_password, get_bank_username
 from notion_finance_sync.twofa.sms import get_sms_code
 
@@ -101,10 +102,9 @@ def build_client(session: ETradeSession) -> httpx.Client:
 
 def _login_failure_screenshot(sb, session_id: str) -> None:
     """Save a screenshot + current URL when login fails, for blind debugging."""
-    from pathlib import Path
 
     try:
-        folder = Path(__file__).resolve().parents[4] / "data" / "snapshots" / "etrade"
+        folder = SNAPSHOTS_DIR / "etrade"
         folder.mkdir(parents=True, exist_ok=True)
         name = f"login_failure_{session_id}_{datetime.now(tz=UTC).strftime('%H%M%S')}.png"
         sb.cdp.save_screenshot(name, folder=str(folder))

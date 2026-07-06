@@ -21,11 +21,11 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import structlog
 
 from notion_finance_sync.browser.factory import open_session
+from notion_finance_sync.config.paths import SNAPSHOTS_DIR
 from notion_finance_sync.config.settings import get_bank_password, get_bank_username
 from notion_finance_sync.twofa.sms import get_sms_code
 
@@ -52,7 +52,7 @@ _CLICK_AUTOGRAPH_JS = (
 
 def _screenshot(sb, session_id: str, label: str) -> None:
     try:
-        folder = Path(__file__).resolve().parents[4] / "data" / "snapshots" / "wells_fargo"
+        folder = SNAPSHOTS_DIR / "wells_fargo"
         folder.mkdir(parents=True, exist_ok=True)
         name = f"{label}_{session_id}_{datetime.now(tz=UTC).strftime('%H%M%S')}.png"
         sb.cdp.save_screenshot(name, folder=str(folder))

@@ -18,10 +18,10 @@ from __future__ import annotations
 import json
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import structlog
 
+from notion_finance_sync.config.paths import SNAPSHOTS_DIR
 from notion_finance_sync.config.settings import get_bank_password, get_bank_username
 from notion_finance_sync.twofa.sms import get_sms_code
 
@@ -41,7 +41,7 @@ FIDELITY_SMS_REGEX = r"(?i)code\s+is\D{0,3}(\d{6})"
 
 def _login_failure_screenshot(sb, session_id: str) -> None:
     try:
-        folder = Path(__file__).resolve().parents[4] / "data" / "snapshots" / "fidelity"
+        folder = SNAPSHOTS_DIR / "fidelity"
         folder.mkdir(parents=True, exist_ok=True)
         name = f"login_failure_{session_id}_{datetime.now(tz=UTC).strftime('%H%M%S')}.png"
         sb.cdp.save_screenshot(name, folder=str(folder))
