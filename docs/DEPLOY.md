@@ -83,18 +83,14 @@ cd .. && git add secrets/op-token.age && git commit -m "OP token" && git push
 file is unreadable it uses a Keychain item `notion-finance-sync-op-token`, stored via
 `security add-generic-password -a "$USER" -s notion-finance-sync-op-token -U -A -w`.)
 
-## 5. **[manual]** Signing cert + Full Disk Access (once)
+## 5. **[manual]** Full Disk Access (once)
 
 The sync reads `~/Library/Messages/chat.db` (SIP-protected) for SMS 2FA. FDA is
-granted to the **signed `NotionFinanceSync.app`** — and because activation re-signs
-it each rebuild with a **stable self-signed cert**, that one grant survives updates.
+granted to the **signed `NotionFinanceSync.app`** — and because activation creates a
+**stable self-signed cert** (automatically, first rebuild) and re-signs the app with
+it every rebuild, that one grant survives updates. Nothing to run for the cert.
 
-```bash
-sudo bash scripts/make-signing-cert.sh    # once: creates the cert in the System keychain
-# (then step 2's darwin-rebuild installs + signs /Applications/NotionFinanceSync.app)
-```
-
-Then System Settings → Privacy & Security → **Full Disk Access** → **[+]** →
+System Settings → Privacy & Security → **Full Disk Access** → **[+]** →
 `/Applications/NotionFinanceSync.app`, toggle on.
 
 Verify (as the app would): grant works if a launchd-run helper can open the DB —

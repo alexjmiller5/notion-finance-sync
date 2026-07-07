@@ -211,9 +211,9 @@ fallback retained). Set `services.notion-finance-sync.tokenFile = config.age.sec
 
 **3. One-time manual steps Nix can't do** (TCC/SIP-protected, secret, or
 interactive): iPhone → Text Message Forwarding to the Mini; encrypt the OP token
-(`agenix -e`); `sudo scripts/make-signing-cert.sh` (stable signing cert, so the FDA
-grant survives rebuilds); grant Full Disk Access to `NotionFinanceSync.app`; run each
-bank's first login once (`--bank <bank> --interactive`). See [`docs/DEPLOY.md`](docs/DEPLOY.md).
+(`agenix -e`); grant Full Disk Access to `NotionFinanceSync.app` (the stable signing
+cert that makes this survive rebuilds is created automatically at activation); run
+each bank's first login once (`--bank <bank> --interactive`). See [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 Requirements: a `nix-darwin` host with `nix-homebrew` (Chrome cask) and
 `allowUnfree` for the `1password-cli`. See `nix/darwin.nix` for all module options;
