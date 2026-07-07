@@ -50,10 +50,13 @@ cd ~/…/nix-config
 sudo darwin-rebuild switch --flake .#mac-mini
 ```
 
-This builds the app into the store, generates `config.toml`, installs the
+This builds the app into the store, wraps it in **`/Applications/NotionFinanceSync.app`**
+(signed with the stable cert from step 5), generates `config.toml`, installs the
 **google-chrome** cask + the **`op`** CLI, and creates the
-`com.notion-finance-sync.daily` launchd **user** agent (fires 03:30 daily). State
-(Chrome profiles, snapshots, logs) lives in `~/Library/Application Support/notion-finance-sync/`.
+`com.notion-finance-sync.daily` launchd **user** agent (fires 03:30 daily, runs the
+`.app`). State (Chrome profiles, snapshots, logs) lives in `~/Library/Application Support/notion-finance-sync/`.
+(Order note: run `scripts/make-signing-cert.sh` from step 5 before the *first*
+rebuild, so the `.app` gets the stable signature and your FDA grant sticks.)
 
 The agent doesn't sync yet — the manual bits below come first.
 
@@ -63,27 +66,41 @@ On your **iPhone**: Settings → Messages → **Text Message Forwarding** → en
 Mac Mini (same Apple ID; confirm the code it shows). Email-2FA banks use the Gmail
 app password from 1Password instead.
 
-## 4. **[manual]** Store the 1Password token in the Keychain
+## 4. **[manual]** Provide the 1Password token via agenix
 
 The service-account token is the bootstrap secret (unlocks every other secret) — it
-can't live in Nix. Store it in the login Keychain:
+can't come *from* `op`, so it lives **age-encrypted in `nix-config`** (recipients:
+the Mini's SSH host key + your laptop key, in `secrets/secrets.nix`) and is decrypted
+at activation to `/run/agenix/op-token`. Encrypt/rotate it from the laptop:
 
 ```bash
-security add-generic-password -a "$USER" -s notion-finance-sync-op-token -w '<TOKEN>' -U
+cd nix-config/secrets
+EDITOR=nano nix run github:ryantm/agenix -- -i ~/.ssh/mac_mini -e op-token.age  # paste ops_… token
+cd .. && git add secrets/op-token.age && git commit -m "OP token" && git push
 ```
 
-(The runner reads it via `security find-generic-password` and exports
-`OP_SERVICE_ACCOUNT_TOKEN` so `op` authenticates unattended.)
+(The runner reads that file and exports `OP_SERVICE_ACCOUNT_TOKEN`. Fallback: if the
+file is unreadable it uses a Keychain item `notion-finance-sync-op-token`, stored via
+`security add-generic-password -a "$USER" -s notion-finance-sync-op-token -U -A -w`.)
 
-## 5. **[manual]** Grant Full Disk Access
+## 5. **[manual]** Signing cert + Full Disk Access (once)
 
-The 2FA reader opens `~/Library/Messages/chat.db` (SIP-protected). System Settings →
-Privacy & Security → **Full Disk Access** → add the launchd-run binary
-(`/nix/store/…-notion-finance-sync-env/bin/notion-finance-sync`) — or, more simply,
-your terminal, and run the first bootstraps (step 6) from it. Re-login after.
+The sync reads `~/Library/Messages/chat.db` (SIP-protected) for SMS 2FA. FDA is
+granted to the **signed `NotionFinanceSync.app`** — and because activation re-signs
+it each rebuild with a **stable self-signed cert**, that one grant survives updates.
 
-Verify: `sqlite3 ~/Library/Messages/chat.db "SELECT COUNT(*) FROM message"` returns
-a number (not `unable to open database file`).
+```bash
+sudo bash scripts/make-signing-cert.sh    # once: creates the cert in the System keychain
+# (then step 2's darwin-rebuild installs + signs /Applications/NotionFinanceSync.app)
+```
+
+Then System Settings → Privacy & Security → **Full Disk Access** → **[+]** →
+`/Applications/NotionFinanceSync.app`, toggle on.
+
+Verify (as the app would): grant works if a launchd-run helper can open the DB —
+the first bank bootstrap (step 6) exercises it. `sqlite3 ~/Library/Messages/chat.db
+"SELECT COUNT(*) FROM message"` from a Full-Disk-Access terminal should return a
+number, confirming the DB is readable at all.
 
 ## 6. **[manual]** Bootstrap each bank — one at a time
 

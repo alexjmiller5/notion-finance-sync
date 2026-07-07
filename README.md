@@ -199,14 +199,21 @@ services.notion-finance-sync = {
 };
 ```
 
-`darwin-rebuild switch` then builds everything and creates the
-`com.notion-finance-sync.daily` launchd user agent. State (Chrome profiles,
-snapshots, logs) lives in `~/Library/Application Support/notion-finance-sync/`.
+`darwin-rebuild switch` then builds everything, wraps the app in a signed
+`/Applications/NotionFinanceSync.app`, and creates the `com.notion-finance-sync.daily`
+launchd user agent (which runs the `.app`). State (Chrome profiles, snapshots, logs)
+lives in `~/Library/Application Support/notion-finance-sync/`.
+
+The **OP service-account token** is provided via [agenix](https://github.com/ryantm/agenix):
+age-encrypted in your `nix-config` (recipients = the Mini host key + your laptop key),
+decrypted at activation to `/run/agenix/op-token`, which the sync reads (Keychain
+fallback retained). Set `services.notion-finance-sync.tokenFile = config.age.secrets.op-token.path;`.
 
 **3. One-time manual steps Nix can't do** (TCC/SIP-protected, secret, or
-interactive): iPhone → Text Message Forwarding to the Mini; store the 1Password
-token in the Keychain; grant Full Disk Access; run each bank's first login once
-(`--bank <bank> --interactive`). See [`docs/DEPLOY.md`](docs/DEPLOY.md) steps 3–6.
+interactive): iPhone → Text Message Forwarding to the Mini; encrypt the OP token
+(`agenix -e`); `sudo scripts/make-signing-cert.sh` (stable signing cert, so the FDA
+grant survives rebuilds); grant Full Disk Access to `NotionFinanceSync.app`; run each
+bank's first login once (`--bank <bank> --interactive`). See [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 Requirements: a `nix-darwin` host with `nix-homebrew` (Chrome cask) and
 `allowUnfree` for the `1password-cli`. See `nix/darwin.nix` for all module options;
