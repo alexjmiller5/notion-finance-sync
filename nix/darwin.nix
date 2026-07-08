@@ -209,7 +209,9 @@ in
         # non-empty p12 password: macOS `security` rejects empty-password PKCS12 (MAC verification fails)
         /usr/bin/openssl pkcs12 -export -inkey "$_t/key.pem" -in "$_t/cert.pem" -out "$_t/id.p12" -passout pass:nfs-signing-p12
         /usr/bin/security import "$_t/id.p12" -k /Library/Keychains/System.keychain -P nfs-signing-p12 -T /usr/bin/codesign -A
-        /usr/bin/security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$_t/cert.pem"
+        # NB: no add-trusted-cert — it needs a GUI auth prompt (fails over SSH), and
+        # it's unnecessary: codesign signs fine with an untrusted self-signed cert and
+        # TCC matches FDA by the designated requirement, not trust.
         /bin/rm -rf "$_t"
       fi
 
