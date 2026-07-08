@@ -195,6 +195,13 @@ in
         fi
         rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in_progress
       fi
+
+      # SeleniumBase UC mode runs the x86_64 chromedriver, which needs Rosetta 2 on
+      # Apple Silicon. Apple component (softwareupdate only, not a nix package).
+      if [ "$(/usr/bin/uname -m)" = "arm64" ] && ! /usr/bin/arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+        echo "installing Rosetta 2 (SeleniumBase UC mode prerequisite)..."
+        /usr/sbin/softwareupdate --install-rosetta --agree-to-license || true
+      fi
     '');
 
     system.activationScripts.postActivation.text = lib.mkAfter ''
