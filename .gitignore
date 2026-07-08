@@ -53,3 +53,6 @@ src/data/
 # nix build symlink
 result
 result-*
+
+# real API captures (sensitive); synthetic *_sample.json are committed
+*_raw.json
