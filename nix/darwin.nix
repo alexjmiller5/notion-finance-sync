@@ -233,6 +233,9 @@ in
       serviceConfig = {
         Label = "com.notion-finance-sync.daily";
         ProgramArguments = [ appExe ];
+        # launchd's default CWD is "/" (read-only); seleniumbase writes browser
+        # downloads to a CWD-relative "downloaded_files", so run from the state dir.
+        WorkingDirectory = cfg.stateDir;
         StartCalendarInterval = [ { Hour = cfg.hour; Minute = cfg.minute; } ];
         RunAtLoad = false;
         StandardOutPath = "${cfg.stateDir}/launchd.log";
