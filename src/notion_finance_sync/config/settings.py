@@ -22,6 +22,7 @@ authenticate without an interactive `op signin`.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tomllib
 from functools import cache
@@ -127,8 +128,16 @@ def _read_op_secret(reference: str) -> str:
         ["op", "read", reference],
         capture_output=True,
         text=True,
-        check=True,
     )
+    if result.returncode != 0:
+        tok = os.environ.get("OP_SERVICE_ACCOUNT_TOKEN", "")
+        which = shutil.which("op") or "(op not on PATH)"
+        raise RuntimeError(
+            f"op read {reference!r} failed (exit {result.returncode}): "
+            f"{result.stderr.strip() or '(no stderr)'} "
+            f"[op={which}; OP_SERVICE_ACCOUNT_TOKEN "
+            f"{'set len=' + str(len(tok)) if tok else 'MISSING'}]"
+        )
     return result.stdout.strip()
 
 
