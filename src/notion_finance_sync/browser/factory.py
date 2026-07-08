@@ -18,11 +18,9 @@ from contextlib import contextmanager
 import structlog
 from seleniumbase import SB
 
-from notion_finance_sync.config.paths import SESSIONS_DIR
+from notion_finance_sync.config.paths import DRIVERS_DIR, SESSIONS_DIR
 
 logger = structlog.get_logger()
-
-SESSIONS_DIR = SESSIONS_DIR
 
 
 @contextmanager
@@ -37,6 +35,14 @@ def open_session(session_id: str, *, headless: bool = False):
     """
     user_data_dir = SESSIONS_DIR / session_id
     user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    # SeleniumBase downloads chromedriver/uc_driver into its own package dir by
+    # default — read-only in the /nix/store. Redirect it to a writable dir (honored
+    # for both the download and driver resolution).
+    DRIVERS_DIR.mkdir(parents=True, exist_ok=True)
+    from seleniumbase.core.browser_launcher import override_driver_dir
+
+    override_driver_dir(str(DRIVERS_DIR))
 
     logger.info("opening_session", session_id=session_id, profile=str(user_data_dir))
 

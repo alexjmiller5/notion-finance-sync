@@ -25,4 +25,7 @@ DATA_DIR = data_dir()
 SESSIONS_DIR = DATA_DIR / "sessions"
 SNAPSHOTS_DIR = DATA_DIR / "snapshots"
 STATEMENTS_DIR = DATA_DIR / "statements"
+# SeleniumBase downloads chromedriver/uc_driver here (its own package dir is
+# read-only in the /nix/store); passed to seleniumbase via override_driver_dir.
+DRIVERS_DIR = DATA_DIR / "drivers"
 HEALTH_FILE = DATA_DIR / "health.json"
