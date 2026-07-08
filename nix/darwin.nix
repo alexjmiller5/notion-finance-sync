@@ -201,13 +201,14 @@ in
       # 1. Ensure a stable self-signed code-signing cert in the System keychain.
       #    Created ONCE (idempotent) and reused every rebuild, so the .app's signature
       #    — and thus the one-time Full Disk Access grant — stays stable. No script.
-      if ! /usr/bin/security find-identity -v -p codesigning /Library/Keychains/System.keychain 2>/dev/null | grep -q ${lib.escapeShellArg cfg.signingIdentity}; then
+      if ! /usr/bin/security find-certificate -c ${lib.escapeShellArg cfg.signingIdentity} /Library/Keychains/System.keychain >/dev/null 2>&1; then
         echo "creating code-signing identity ${cfg.signingIdentity} (one-time)..."
         _t="$(/usr/bin/mktemp -d)"
         /usr/bin/printf '[req]\ndistinguished_name=dn\nx509_extensions=v3\nprompt=no\n[dn]\nCN=%s\n[v3]\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\n' ${lib.escapeShellArg cfg.signingIdentity} > "$_t/req.cnf"
         /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout "$_t/key.pem" -out "$_t/cert.pem" -config "$_t/req.cnf"
-        /usr/bin/openssl pkcs12 -export -inkey "$_t/key.pem" -in "$_t/cert.pem" -out "$_t/id.p12" -passout pass:
-        /usr/bin/security import "$_t/id.p12" -k /Library/Keychains/System.keychain -P "" -T /usr/bin/codesign -A
+        # non-empty p12 password: macOS `security` rejects empty-password PKCS12 (MAC verification fails)
+        /usr/bin/openssl pkcs12 -export -inkey "$_t/key.pem" -in "$_t/cert.pem" -out "$_t/id.p12" -passout pass:nfs-signing-p12
+        /usr/bin/security import "$_t/id.p12" -k /Library/Keychains/System.keychain -P nfs-signing-p12 -T /usr/bin/codesign -A
         /usr/bin/security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$_t/cert.pem"
         /bin/rm -rf "$_t"
       fi
