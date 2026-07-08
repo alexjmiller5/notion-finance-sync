@@ -181,6 +181,22 @@ in
       casks = [ "google-chrome" ];
     };
 
+    # Homebrew (for the google-chrome cask above) needs Xcode Command Line Tools,
+    # but they're Apple-proprietary (softwareupdate only, not a nix package). Install
+    # them before the Homebrew step so nothing is manual. Lives in the module because
+    # the module is what pulls in the Chrome cask that needs them.
+    system.activationScripts.preActivation.text = lib.mkIf cfg.installChrome (lib.mkBefore ''
+      if ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
+        echo "installing Xcode Command Line Tools (Homebrew prerequisite)..."
+        touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in_progress
+        prod="$(/usr/sbin/softwareupdate -l 2>/dev/null | grep -i 'label:.*command line tools' | tail -1 | sed 's/^.*[Ll]abel: //')"
+        if [ -n "$prod" ]; then
+          /usr/sbin/softwareupdate -i "$prod" --verbose || true
+        fi
+        rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in_progress
+      fi
+    '');
+
     system.activationScripts.postActivation.text = lib.mkAfter ''
       # 1. Ensure a stable self-signed code-signing cert in the System keychain.
       #    Created ONCE (idempotent) and reused every rebuild, so the .app's signature
