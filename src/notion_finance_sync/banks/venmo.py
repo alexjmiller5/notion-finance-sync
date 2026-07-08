@@ -7,10 +7,11 @@ Why this and not the mobile API / web login form:
 
 The web *API* (`account.venmo.com/api/stories`) is cookie-authed and works from plain
 ``httpx`` once you have a logged-in session's cookies — DataDome does NOT block the
-authenticated JSON GET. Cookies are captured once via ``scripts/venmo_web_capture.py``
-(auto-fills creds, auto-reads the SMS 2FA from Messages, ticks "remember this device",
-saves cookies + the user's external id). The daily sync then just replays those cookies.
-Re-run the capture when the session expires. See ``data/snapshots/venmo/FINDINGS.md``.
+authenticated JSON GET. When the session files are missing or expired, the scraper calls
+``venmo_session.capture_session()`` itself (auto-fills creds, auto-reads the SMS 2FA from
+Messages, ticks "remember this device", saves cookies + external id) and retries — so the
+daily sync logs itself in with no manual step. ``scripts/venmo_web_capture.py`` remains a
+thin wrapper for a forced manual re-capture. See ``data/snapshots/venmo/FINDINGS.md``.
 
 Field mapping (SPEC §17):
 - ``name``     "Sent to {person}" / "Received from {person}" (from the signed amount)
@@ -31,6 +32,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -158,17 +160,14 @@ def parse_stories(raw: dict, *, my_user_id: str) -> list[TransactionRecord]:
 # ---------------------------------------------------------------------------
 def _load_cookies() -> dict[str, str]:
     if not _COOKIES_FILE.exists():
-        raise RuntimeError(
-            "No Venmo web-session cookies. Run `scripts/venmo_web_capture.py` to log in "
-            "and capture them (auto-reads the SMS 2FA)."
-        )
+        raise RuntimeError("No Venmo web-session cookies; capture a session first.")
     return json.loads(_COOKIES_FILE.read_text())
 
 
 def _external_id() -> str:
     if _EXTID_FILE.exists() and _EXTID_FILE.read_text().strip():
         return _EXTID_FILE.read_text().strip()
-    raise RuntimeError("No Venmo external_id saved. Re-run scripts/venmo_web_capture.py.")
+    raise RuntimeError("No Venmo external_id saved; capture a session first.")
 
 
 def _client() -> httpx.Client:
@@ -207,10 +206,7 @@ def _fetch_stories(client: httpx.Client, ext_id: str, since: date, *, max_pages:
         if resp.status_code in (301, 302, 401, 403) or "json" not in resp.headers.get(
             "content-type", ""
         ):
-            raise RuntimeError(
-                f"Venmo web session invalid (HTTP {resp.status_code}). Re-run "
-                "scripts/venmo_web_capture.py to refresh cookies."
-            )
+            raise RuntimeError(f"Venmo web session invalid (HTTP {resp.status_code})")
         body = resp.json()
         stories = body.get("stories") or []
         if not stories:
@@ -225,6 +221,23 @@ def _fetch_stories(client: httpx.Client, ext_id: str, since: date, *, max_pages:
     return {"stories": all_stories}
 
 
+def _run_with_session[T](work: Callable[[], T]) -> T:
+    """Run ``work()``; on missing/expired session (RuntimeError) capture once and retry.
+
+    ``work`` must re-create ``_client()`` itself on each call so the retry uses the
+    freshly-captured cookies. A second RuntimeError propagates.
+    """
+    try:
+        return work()
+    except RuntimeError as exc:
+        logger.info("venmo_session_refresh", reason=str(exc))
+        # Lazy import: keeps the browser/SMS deps off the fast httpx replay path.
+        from notion_finance_sync.banks.venmo_session import capture_session
+
+        capture_session()
+        return work()
+
+
 class VenmoScraper:
     SESSION_ID = "venmo"
     BANK_DISPLAY_NAME = "Venmo"
@@ -232,28 +245,36 @@ class VenmoScraper:
     CATEGORY_MAP: CategoryMap = {}  # Venmo has no bank categories
 
     def fetch_recent(self, since: date) -> list[TransactionRecord]:
-        client = _client()
-        try:
-            ext_id = _external_id()
-            raw = _fetch_stories(client, ext_id, since)
-            recs = parse_stories(raw, my_user_id=ext_id)
-            recs = [r for r in recs if r.transaction_date and r.transaction_date >= since]
-            logger.info("venmo_fetched", count=len(recs), since=since.isoformat())
-            return recs
-        finally:
-            client.close()
+        def work() -> list[TransactionRecord]:
+            client = _client()
+            try:
+                ext_id = _external_id()
+                raw = _fetch_stories(client, ext_id, since)
+                recs = parse_stories(raw, my_user_id=ext_id)
+                recs = [r for r in recs if r.transaction_date and r.transaction_date >= since]
+                logger.info("venmo_fetched", count=len(recs), since=since.isoformat())
+                return recs
+            finally:
+                client.close()
+
+        return _run_with_session(work)
 
     def fetch_historical(self, start: date, end: date) -> list[TransactionRecord]:
-        client = _client()
-        try:
-            ext_id = _external_id()
-            raw = _fetch_stories(client, ext_id, start)
-            recs = parse_stories(raw, my_user_id=ext_id)
-            recs = [r for r in recs if r.transaction_date and start <= r.transaction_date <= end]
-            logger.info("venmo_historical", count=len(recs))
-            return recs
-        finally:
-            client.close()
+        def work() -> list[TransactionRecord]:
+            client = _client()
+            try:
+                ext_id = _external_id()
+                raw = _fetch_stories(client, ext_id, start)
+                recs = parse_stories(raw, my_user_id=ext_id)
+                recs = [
+                    r for r in recs if r.transaction_date and start <= r.transaction_date <= end
+                ]
+                logger.info("venmo_historical", count=len(recs))
+                return recs
+            finally:
+                client.close()
+
+        return _run_with_session(work)
 
     def download_statements(self, start: date, end: date) -> list[Path]:
         raise NotImplementedError("Venmo has no PDF statements; live API covers full history")
