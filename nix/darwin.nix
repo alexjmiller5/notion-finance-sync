@@ -99,9 +99,9 @@ in
       type = tomlFormat.type;
       description = ''
         config.toml contents (non-secret identifiers), generated into the store and
-        passed via NFS_CONFIG. Mirrors config.example.toml: sections `email`,
-        `bilt`, `notion` (with `property_ids`), and `onepassword`. Secrets are NOT
-        here.
+        passed via NFS_CONFIG. Mirrors config.example.toml: sections `notion` (with
+        `property_ids`) and `onepassword`. Secrets and personal identifiers (gmail
+        address, Bilt phone) are NOT here — they live in 1Password.
       '';
     };
 

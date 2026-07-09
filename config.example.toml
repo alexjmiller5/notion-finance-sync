@@ -3,18 +3,10 @@
 # Copy this to `config.toml` (gitignored) and fill in YOUR values:
 #   cp config.example.toml config.toml
 #
-# SECRETS DO NOT GO HERE. Bank passwords, the Notion API key, and the Gmail app
-# password live in 1Password; the Gmail *address* lives in .env (gitignored).
+# SECRETS DO NOT GO HERE. Bank passwords, the Notion API key, the Gmail app
+# password, AND personal identifiers (gmail address, Bilt phone) live in
+# 1Password — see the "Personal Identifiers" item in the project vault.
 # This file holds only non-secret identifiers that differ per person/workspace.
-
-[email]
-# Address the SMS/email-2FA reader logs in as (the Gmail IMAP username). Some
-# banks send 2FA by email; the app password itself lives in 1Password.
-gmail_address = "you@example.com"
-
-[bilt]
-# Bilt auths by SMS OTP to this number (10 digits, no username/password vault item).
-phone = "5551234567"
 
 [notion]
 # Your Notion Transactions database. The data_source_id is what the API writes

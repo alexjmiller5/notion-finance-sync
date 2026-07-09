@@ -40,14 +40,6 @@ logger = structlog.get_logger()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-class _EmailConfig(BaseModel):
-    gmail_address: str
-
-
-class _BiltConfig(BaseModel):
-    phone: str
-
-
 class _NotionConfig(BaseModel):
     transactions_database_id: str
     transactions_data_source_id: str
@@ -64,8 +56,6 @@ class _OnePasswordConfig(BaseModel):
 class _ProjectConfig(BaseModel):
     """Validated shape of config.toml (personal, non-secret identifiers)."""
 
-    email: _EmailConfig
-    bilt: _BiltConfig
     notion: _NotionConfig
     onepassword: _OnePasswordConfig
 
@@ -112,6 +102,10 @@ OP_SERVICE_ACCOUNT_TOKEN_REF = _CONFIG.onepassword.service_account_token_ref
 # session_id -> 1Password item title/id (username + password fields). Banks that
 # auth by phone device-trust (e.g. Bilt) need no entry.
 OP_BANK_ITEM_BY_SESSION: dict[str, str] = _CONFIG.onepassword.bank_items
+
+# "Personal Identifiers" item in the project vault (gmail_address, bilt_phone).
+# Referenced by ID so a rename never breaks it.
+OP_PERSONAL_IDS_ITEM = "2d3cinnygtoncroxdb5iyfvbea"
 
 
 def get_notion_property_ids() -> dict[str, str]:
@@ -175,18 +169,19 @@ def get_gmail_app_password() -> str:
 def get_gmail_address() -> str:
     """Email address (the IMAP username) for the Gmail 2FA reader.
 
-    From ``[email].gmail_address`` in config.toml (gitignored — never committed,
-    so the personal email stays out of source control). A ``GMAIL_ADDRESS`` env
-    var still overrides, for CI / ad-hoc runs.
+    From the "Personal Identifiers" item in the project vault, so the personal
+    email never appears in any repo (config.toml included — nix generates that
+    into the world-readable store). A ``GMAIL_ADDRESS`` env var still overrides,
+    for CI / ad-hoc runs.
     """
-    return os.environ.get("GMAIL_ADDRESS") or _CONFIG.email.gmail_address
+    return _resolve("GMAIL_ADDRESS", f"op://{OP_VAULT}/{OP_PERSONAL_IDS_ITEM}/gmail_address")
 
 
 @cache
 def get_bilt_phone() -> str:
-    """Bilt SMS-OTP phone number (10 digits). From ``[bilt].phone`` in config.toml;
-    ``BILT_PHONE`` env still overrides."""
-    return os.environ.get("BILT_PHONE") or _CONFIG.bilt.phone
+    """Bilt SMS-OTP phone number (10 digits). From the "Personal Identifiers"
+    item in the project vault; ``BILT_PHONE`` env still overrides."""
+    return _resolve("BILT_PHONE", f"op://{OP_VAULT}/{OP_PERSONAL_IDS_ITEM}/bilt_phone")
 
 
 def _bank_item_name(session_id: str) -> str:
