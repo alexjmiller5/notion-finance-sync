@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 # 3223 = Cash+ Visa Signature. Both Notion options already exist.
 CARD_META: dict[str, tuple[str, CardNetwork]] = {
     "3223": ("Cash+ Visa Signature", CardNetwork.VISA),
-    "2019": ("Harris Teeter Rewards World Elite", CardNetwork.MASTERCARD),
+    "2019": ("Harris Teeter", CardNetwork.MASTERCARD),
 }
 
 

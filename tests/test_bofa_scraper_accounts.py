@@ -21,7 +21,7 @@ NOTION_CREDIT_CARD_ACCOUNT_OPTIONS = {
     "NEA Customized Cash Rewards",
     "Advantage Plus",
     "Cash+ Visa Signature",
-    "Harris Teeter Rewards World Elite",
+    "Harris Teeter",
     "Bilt Blue Card",
 }
 

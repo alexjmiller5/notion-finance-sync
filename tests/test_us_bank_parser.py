@@ -106,7 +106,7 @@ def test_card_metadata_mapped(records):
     for r in records:
         by_card.setdefault(r.raw_data["accountNumber"], r)
     ht = by_card["2019"]
-    assert ht.credit_card_account == "Harris Teeter Rewards World Elite"
+    assert ht.credit_card_account == "Harris Teeter"
     assert ht.card_network == CardNetwork.MASTERCARD
     cashplus = by_card["3223"]
     assert cashplus.credit_card_account == "Cash+ Visa Signature"
