@@ -37,6 +37,29 @@ AuthMode = Literal["service_account", "manual"]
 LOGIN_URL = "https://www.bankofamerica.com/"
 OVERVIEW_MARKER = "Accounts Overview"
 
+# The authcode page now requires selecting a "remember this device" security
+# preference before it will submit. Pick "Yes" (also trusts the device, so future
+# runs may skip 2FA). Selected by the radio's visible label since the id varies.
+_REMEMBER_DEVICE_JS = r"""
+(() => {
+  const radios = [...document.querySelectorAll('input[type=radio]')];
+  const labelText = (r) => {
+    let t = '';
+    if (r.id) {
+      const l = document.querySelector('label[for="' + r.id + '"]');
+      if (l) t += ' ' + l.textContent;
+    }
+    const p = r.closest('label'); if (p) t += ' ' + p.textContent;
+    if (r.parentElement) t += ' ' + r.parentElement.textContent;
+    return t;
+  };
+  for (const r of radios) {
+    if (/yes.{0,4}remember this device/i.test(labelText(r))) { r.click(); return 'yes'; }
+  }
+  return 'not-found';
+})()
+"""
+
 # BofA sends the one-time code by SMS from short code 73981. Real formats (2026):
 #   "BofA: DO NOT share this Sign In code... Code 123456."   (dominant)
 #   "BofA: Your code is 123456. ... Call 800.933.6262 ..."
@@ -186,6 +209,10 @@ def perform_login(
             raise RuntimeError("BofA 2FA code was not received within timeout")
     else:
         sb.cdp.type("#ahAuthcodeValidateOTP", code)
+        # BofA now requires a "remember this device" security preference on this page
+        # before it will submit; select "Yes" (also trusts the device).
+        result = sb.cdp.evaluate(_REMEMBER_DEVICE_JS)
+        logger.info("bofa_remember_device", result=result)
         sb.cdp.click("#ah-authcode-validate-continue-btn")
 
     # 4. Logged in.

@@ -62,13 +62,17 @@ def _handle_2fa(sb, interactive: bool) -> None:
         logger.info("fidelity_2fa_skipped_device_trust")
         return
 
-    # Push-notification challenge appears first -> switch to a code method.
+    # Get to the SMS-code screen. If the delivery buttons ("Text me the code") are
+    # already shown, click straight through; only use "Try another way" when they're
+    # NOT present (e.g. a push-notification challenge shows first). Clicking "Try
+    # another way" on the delivery screen navigates away from the "Text me" button.
     if not sb.cdp.is_element_present("#dom-otp-code-input"):
-        try:
-            sb.cdp.wait_for_element_visible("#dom-try-another-way-link", timeout=20)
-            sb.cdp.click("#dom-try-another-way-link")
-        except Exception:  # noqa: BLE001 — maybe already on a code page
-            pass
+        if not sb.cdp.is_element_present("#dom-channel-list-primary-button"):
+            try:
+                sb.cdp.wait_for_element_visible("#dom-try-another-way-link", timeout=20)
+                sb.cdp.click("#dom-try-another-way-link")
+            except Exception:  # noqa: BLE001 — maybe already on a code page
+                pass
 
     code_requested_at = datetime.now(tz=UTC)
     if sb.cdp.is_element_present("#dom-channel-list-primary-button"):
